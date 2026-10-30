@@ -16,7 +16,7 @@
 | # | 你的要求 | 方案 |
 |---|---|---|
 | 1 | NAS 的 Docker 里 | 单容器，`python:3.12-slim` + uvicorn，约 140 MB（含 Pillow 与中文字体）；`docker-compose.yml` 见 §8 |
-| 2 | 数据库目录只读挂载 | 容器内 `/data/trim` 以 `:ro` 挂载；进程用 `mode=ro` 打开，再 `backup()` 到自己的卷 |
+| 2 | 数据库目录只读访问 | 进程用 `?mode=ro` 打开源库，再 `backup()` 到自己的卷；挂载本身**不加 `:ro`**（WAL 库要建 `-shm`，原因见 §6.2） |
 | 3 | 仅管理员、可排除库/账号 | 单管理员账号登录；`exclusion` 表按「媒体库」和「账号」两个维度排除，**默认排除 `adult` 库和 `adult` 账号** |
 | 4 | 时间线形态 | 见 §2：**活跃热力带 + 观看流 + 正在追**，不是甘特图（原因见 §2.1） |
 | 5 | 复用飞牛已刮削的海报 | **可以，而且比 TMDB 更好**——归档里存的已经是本地文件名，见 §5 |
@@ -106,13 +106,15 @@
 
 | 容器内路径 | 挂载 | 用途 |
 |---|---|---|
-| `/data/trim` | `:ro` | `trimmedia.db` / `trimmedia_ext.db` / `trimactivity.db` |
+| `/data/trim` | 读写挂载 | `trimmedia.db` / `trimmedia_ext.db` / `trimactivity.db`（WAL 库，需要能建 `-shm`；只读由连接串 `?mode=ro` 保证） |
 | `/data/meta` | `:ro` | 海报图片目录 |
 | `/app/data` | 读写 | `app.db`（账号、排除项）、`snap/*.db`（快照） |
 
 ### 6.2 快照
 
 不直接查生产库，原因有三个：WAL 模式下只读连接可能因为 `-shm` 不可写而报错、长时间查询会占锁、多份库需要一致性视图。
+
+第一条在部署时被实测证实：`/data/trim` 加 `:ro` 时，`mode=ro` 打开源库直接报 `unable to open database file`（只读目录里建不了 `-shm`），实时在线页只能退回快照。所以**挂载不加 `:ro`**，只读完全由连接串保证——只读连接不写主库、不 checkpoint，只会在目录里创建/映射 `-shm`。
 
 做法：启动时 + 每 10 分钟（可配）+ 手动点「刷新」，用 SQLite 的 `backup()` 把三份库复制到 `snap/`，之后所有查询都读快照。单次约 40 MB，NAS 上不到 1 秒。
 
@@ -183,16 +185,16 @@ services:
       SNAPSHOT_MINUTES: "10"
       APP_SECRET: "换成随机字符串"
     volumes:
-      - /usr/local/apps/@appdata/trim.media/database:/data/trim:ro
+      - /usr/local/apps/@appdata/trim.media/database:/data/trim
       - /vol1/@appmeta/trim.media:/data/meta:ro
       - ./data:/app/data
 ```
 
 要点：
 
-- 两个挂载**都加 `:ro`**，容器里没有任何写权限，物理上不可能改坏飞牛；
+- `/data/meta` 加 `:ro`；`/data/trim` **不能加**——源库是 WAL，只读挂载下 SQLite 建不了 `-shm`，会直接报 `unable to open database file`。不写坏飞牛这件事改由应用层保证：所有源库连接都用 `?mode=ro`；
 - `media_server.meta_dir` 记录的是 `/vol1/@appmeta/trim.media`，海报应该在里面。不确定就先只挂 `database`，页面会退化成色块，不影响使用；
-- 在飞牛 Docker 应用里，把上面两个宿主机路径加进「文件夹」映射、勾选只读即可，端口 8787 随便换；
+- 在飞牛 Docker 应用里，把上面两个宿主机路径加进「文件夹」映射：海报目录勾只读，数据库目录**不要**勾只读（原因见上）；端口 8787 随便换；
 - 建议再加一条 `healthcheck: curl -f http://localhost:8787/health`。
 
 ---
@@ -252,7 +254,7 @@ M1–M4 已完成，`README.md` 是使用说明，`docs/images/app-*.png` 是真
 
 阈值：**5 分钟**内有进度上报算「正在看」（飞牛在暂停时不上报，长暂停会被判定为离开），**30 分钟**内有访问算「活跃」，**12 小时**内有令牌算「在线设备」。这些数字写在 `app/live.py` 顶部，想调直接改。
 
-为什么不用快照：快照是 10 分钟一次，看实时状态没意义。`/live` 每次请求都开一个新的只读连接直查源库，结果缓存 3 秒防止多标签页放大查询；连接失败就退回快照并在页面顶部说明，而不是假装实时。
+为什么不用快照：快照是 10 分钟一次，看实时状态没意义。`/live` 每次请求都开一个新的只读连接直查源库，结果缓存 3 秒防止多标签页放大查询；连接失败就退回快照并在页面顶部说明，而不是假装实时。（前提：`/data/trim` 可写挂载，见 §6.2。）
 
 隐私：接口里不返回 token，IP 只保留前三段，设备型号原样显示（`app_name` 映射成「网页 / Android / iOS / 电视端 / Kodi」）。
 

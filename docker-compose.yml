@@ -29,8 +29,11 @@ services:
       # EXCLUDE_DEFAULT_LIBRARY: "示例媒体库"
       # EXCLUDE_DEFAULT_ACCOUNT: "示例账号"
     volumes:
-      # 飞牛影视的数据库目录，只读
-      - /usr/local/apps/@appdata/trim.media/database:/data/trim:ro
+      # 飞牛影视的数据库目录。**不要加 :ro**：源库是 WAL 模式，SQLite 只读打开时需要在
+      # 同目录创建/映射 -shm 共享内存文件，只读挂载会直接报 "unable to open database file"，
+      # 实时在线页只能退回快照、同步也会静默退化成整份复制。
+      # 不写坏飞牛这件事由应用层保证：所有源库连接都用 ?mode=ro，不写主库、不 checkpoint。
+      - /usr/local/apps/@appdata/trim.media/database:/data/trim
       # 海报与缓存目录，只读（没有这个目录也能跑，海报会退化成色块）
       - /vol1/@appmeta/trim.media:/data/meta:ro
       # 本应用自己的数据：快照 + app.db
