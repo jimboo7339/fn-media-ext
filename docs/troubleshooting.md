@@ -10,6 +10,8 @@ INFO:  已忽略 126 次非 HTTP 请求（约 5 分钟内），最近来自 192.
 
 计数同时暴露在 `/health` 的 `bad_requests` / `last_bad_peer` 字段里。想看原始告警就设 `QUIET_BAD_HTTP=0`。
 
+**连这条汇总也不想看见**：设 `QUIET_SUMMARY=0`（`docker-compose.yml` 里已默认这么配），日志里彻底不再出现任何相关内容，计数仍然留在 `/health` 里可查。这条开关改完要 `docker compose up -d --build` 才生效。
+
 **通常到这里就不用往下看了。** 下面几节是「想知道到底是谁在探」时用的。
 
 ## 这是什么
@@ -215,7 +217,17 @@ docker run --rm --net=host nicolaka/netshoot tcpdump -i any -nn -e 'tcp port 878
 
 ## 最后一节：查清之后想静音
 
-确认无害、只是嫌日志吵，在 `docker-compose.yml` 的 service 里加一行 `command` 覆盖（**不用重新构建镜像**）：
+**方案 A（首选，只消这一条，其它告警照旧）**：`docker-compose.yml` 里已有 `QUIET_SUMMARY: "0"`，
+日志里不再出现任何「非 HTTP 请求」相关内容，计数仍可在 `/health` 的 `bad_requests` 里查。
+这条开关在应用代码里，需要重建镜像：
+
+```bash
+docker compose up -d --build
+```
+
+> 老镜像不认识 `QUIET_SUMMARY`，若只 `up -d` 不重建，行为回到「每 5 分钟一条」——不会变多，放心。
+
+**方案 B（兜底，不用重建镜像，但会一并压掉其它 INFO/WARNING）**：在 `docker-compose.yml` 的 service 里加一行 `command` 覆盖：
 
 ```yaml
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787",
@@ -223,5 +235,8 @@ docker run --rm --net=host nicolaka/netshoot tcpdump -i any -nn -e 'tcp port 878
 ```
 
 然后 `docker compose up -d`。只保留 ERROR，WARNING 及以下（包括这条）都不再输出。
+
+**方案 C（不重建，且保留其它告警）**：临时把 `QUIET_REPORT_SECONDS` 设得很大（例如 `"31536000"`），
+汇总实际上就不会再触发。属于权宜之计，重建后建议换回方案 A。
 
 > 建议先查清来源再静音。持续探测本身在消耗 NAS 资源，而且如果哪天变成真正的连接问题，静音会让你看不见线索。

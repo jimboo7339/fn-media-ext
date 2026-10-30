@@ -8,6 +8,9 @@ uvicorn 的解析器拒绝后每次都会打一条 WARNING。经抓包确认：
 
 这里做的是「外科手术式」处理：只吞掉这一条特定消息，其它告警照旧；
 同时按周期汇总成一条 INFO，并把对端地址带上——这样既不刷屏，也不瞎。
+
+如果连这条汇总也不想看见，设 `QUIET_SUMMARY=0`：只静默计数、不打任何日志，
+日志里彻底不再出现相关内容，计数仍然留在 `/health` 里可查。
 """
 from __future__ import annotations
 
@@ -19,6 +22,9 @@ import time
 BAD_HTTP_MSG = "Invalid HTTP request received."
 
 ENABLED = os.getenv("QUIET_BAD_HTTP", "1") not in ("0", "false", "no")
+# 汇总开关：设 0 就只计数、一条也不打（计数仍在 /health 里）
+SUMMARY = os.getenv("QUIET_SUMMARY", "1") not in ("0", "false", "no")
+# 汇总周期（秒）；<=0 一律视为「不汇总」，免得有人误设 0 反而变成每条都打
 REPORT_SECONDS = float(os.getenv("QUIET_REPORT_SECONDS", "300"))
 
 _STATE = {"since_report": 0, "total": 0, "last_report": time.time(), "last_peer": ""}
@@ -29,6 +35,7 @@ def stats() -> dict:
         "bad_requests": _STATE["total"],
         "bad_requests_since_report": _STATE["since_report"],
         "last_bad_peer": _STATE["last_peer"],
+        "quiet_summary": SUMMARY,
     }
 
 
@@ -72,7 +79,7 @@ class BadHTTPFilter(logging.Filter):
 
         now = time.time()
         elapsed = now - _STATE["last_report"]
-        if elapsed >= REPORT_SECONDS:
+        if SUMMARY and REPORT_SECONDS > 0 and elapsed >= REPORT_SECONDS:
             logging.getLogger("uvicorn.error").info(
                 "已忽略 %d 次非 HTTP 请求（约 %d 分钟内），最近来自 %s。"
                 "这说明有本机或网关组件在探测这个端口，请求已被丢弃，不影响本应用。",

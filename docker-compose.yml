@@ -22,6 +22,8 @@ services:
       SYNC_BLOCKING_WAIT: "5"
       # 把「非 HTTP 请求」的重复告警收成每 5 分钟一条；设 0 恢复原始告警
       QUIET_BAD_HTTP: "1"
+      # 设 0 = 连那条 5 分钟汇总也不打，日志里彻底消失（计数仍在 /health 的 bad_requests）
+      QUIET_SUMMARY: "0"
       QUIET_REPORT_SECONDS: "300"
       # 首次启动时预置的排除项（逗号分隔）。留空即不排除任何东西。
       # EXCLUDE_DEFAULT_LIBRARY: "示例媒体库"

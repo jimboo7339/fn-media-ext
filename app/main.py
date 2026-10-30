@@ -52,7 +52,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="观影时间线", lifespan=lifespan, docs_url=None, redoc_url=None)
-quiet.install()  # 吞掉「非 HTTP 请求」的重复告警，按周期汇总成一条
+quiet.install()  # 吞掉「非 HTTP 请求」的重复告警；是否再打周期汇总由 QUIET_SUMMARY 决定
 app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), name="static")
 tpl = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
 tpl.env.globals.update(color_of=queries.color_of, initial=queries.initial, hue_of=queries.hue_of)
