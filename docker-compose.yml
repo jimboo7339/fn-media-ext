@@ -1,0 +1,35 @@
+services:
+  fn-media-ext:
+    build: .
+    image: fn-media-ext:latest
+    container_name: fn-media-ext
+    restart: unless-stopped
+    # 实测常驻 65–70 MB，同步峰值 75 MB；留出余量防止异常时占满 NAS 内存
+    mem_limit: 256m
+    ports:
+      - "18787:8787"
+    environment:
+      TZ: Asia/Shanghai
+      DATA_DIR: /data/app
+      TRIM_DB_DIR: /data/trim
+      TRIM_IMG_ROOT: /data/meta/img
+      # 定时兜底同步；另外每次打开页面时如果数据超过 60 秒也会补一次
+      SNAPSHOT_MINUTES: "10"
+      SYNC_ON_VIEW: "1"
+      SYNC_STALE_SECONDS: "60"
+      # 陈旧超过这个秒数（正常不会发生，除非定时循环停摆）就等同步完再出页面，最多等 5 秒
+      SYNC_BLOCKING_SECONDS: "1800"
+      SYNC_BLOCKING_WAIT: "5"
+      # 把「非 HTTP 请求」的重复告警收成每 5 分钟一条；设 0 恢复原始告警
+      QUIET_BAD_HTTP: "1"
+      QUIET_REPORT_SECONDS: "300"
+      # 首次启动时预置的排除项（逗号分隔）。留空即不排除任何东西。
+      # EXCLUDE_DEFAULT_LIBRARY: "示例媒体库"
+      # EXCLUDE_DEFAULT_ACCOUNT: "示例账号"
+    volumes:
+      # 飞牛影视的数据库目录，只读
+      - /usr/local/apps/@appdata/trim.media/database:/data/trim:ro
+      # 海报与缓存目录，只读（没有这个目录也能跑，海报会退化成色块）
+      - /vol1/@appmeta/trim.media:/data/meta:ro
+      # 本应用自己的数据：快照 + app.db
+      - ./appdata:/data/app

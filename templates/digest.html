@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}每日日报 · 观影时间线{% endblock %}
+{% block heading %}每日日报{% endblock %}
+{% block sub %}
+{{ report.label }}{% if report.totals.events %} · {{ report.totals.events }} 条记录 · {{ report.totals.people }} 人 · {{ report.totals.shows }} 部剧{% endif %}
+· {% if conf.on %}每天 {{ conf.at }} 自动推送{% else %}自动推送未启用{% endif %}
+{% endblock %}
+
+{% block tools %}
+<div class="seg">
+  <a href="/digest?day={{ prev_day }}" title="前一天">‹ 前一天</a>
+  <a href="/digest?day={{ today }}" class="{{ 'on' if day == today }}">今天</a>
+  {% if next_allowed %}<a href="/digest?day={{ next_day }}" title="后一天">后一天 ›</a>{% endif %}
+</div>
+<form method="post" action="/digest/send">
+  <input type="hidden" name="day" value="{{ day }}">
+  <button class="btn primary" type="submit">立即推送</button>
+</form>
+{% endblock %}
+
+{% block content %}
+{% if saved %}<div class="ok" style="margin-bottom:12px">推送设置已保存</div>{% endif %}
+{% if sent == 'ok' %}<div class="ok" style="margin-bottom:12px">✓ {{ note or '推送成功' }}</div>{% endif %}
+{% if sent == 'err' %}<div class="err" style="margin-bottom:12px">{{ note or '推送失败' }}</div>{% endif %}
+
+<div class="kpis">
+  <div class="kpi"><div class="k">观看记录</div><div class="v">{{ report.totals.events }}<small>条{% if report.totals.episodes and report.totals.episodes != report.totals.events %} · {{ report.totals.episodes }} 集{% endif %}</small></div></div>
+  <div class="kpi"><div class="k">观看时长</div><div class="v">{% if report.totals.minutes >= 60 %}{{ report.totals.minutes // 60 }}<small>小时 {{ report.totals.minutes % 60 }} 分</small>{% else %}{{ report.totals.minutes }}<small>分</small>{% endif %}</div></div>
+  <div class="kpi"><div class="k">参与成员</div><div class="v">{{ report.totals.people }}<small>人 · {{ report.totals.shows }} 部剧</small></div></div>
+  <div class="kpi"><div class="k">新增入库</div><div class="v">{{ report.additions.groups }}<small>部 · {{ report.additions.episodes }} 集{% if report.additions.movies %} · {{ report.additions.movies }} 部电影{% endif %}</small></div></div>
+</div>
+
+{% if not report.totals.events and not report.additions.groups %}
+<div class="empty">这一天既没有观看记录，也没有新内容入库</div>
+{% endif %}
+
+{% if report.people %}
+<div class="lgrid">
+  <div class="lcard">
+    <h3>{% if report.by_minutes %}观影时长排名{% else %}成员观看排名{% endif %}
+      <span>{% if report.by_minutes %}按估算时长{% else %}没有播放位置，按记录数{% endif %}</span></h3>
+    {% for p in report.people %}
+    <a class="rk" href="/user/{{ p.name|urlencode }}" style="grid-template-columns:20px 82px 1fr 104px">
+      <span class="n">{{ loop.index }}</span>
+      <span class="nm">{{ p.name }}</span>
+      <span class="bar"><i style="width:{{ p.pct }}%"></i></span>
+      <span class="v">{{ p.value_label }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="lcard">
+    <h3>成员明细<span>{{ report.totals.people }} 人</span></h3>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>成员</th><th>记录</th><th>集数</th><th>看的剧</th><th>最近</th></tr></thead>
+        <tbody>
+        {% for p in report.people %}
+        <tr>
+          <td data-label="成员"><span class="who"><span class="d" style="background:{{ p.color }}"></span>
+            <a class="lnk" href="/user/{{ p.name|urlencode }}">{{ p.name }}</a></span></td>
+          <td data-label="记录" class="num">{{ p.events }}</td>
+          <td data-label="集数" class="num">{{ p.episodes }}</td>
+          <td data-label="看的剧">{% if p.top_show %}<a class="lnk" href="/show/{{ p.top_key|urlencode }}">{{ p.top_show }}</a>{% if p.top_eps %} <span class="num">{{ p.top_eps }}</span>{% endif %}{% if p.shows_n > 1 %} 等 {{ p.shows_n }} 部{% endif %}{% else %}—{% endif %}</td>
+          <td data-label="最近" class="num">{{ p.last_label }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="content">
+  <div class="feed">
+    <div class="lcard">
+      <h3>剧集观看<span>{{ report.shows|length }} 部</span></h3>
+      {% if report.shows %}
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>剧集</th><th>集数</th><th>人数</th><th>时长</th><th>看到</th><th>更新至</th><th>媒体库</th></tr></thead>
+          <tbody>
+          {% for s in report.shows %}
+          <tr>
+            <td data-label="剧集"><a class="lnk" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a></td>
+            <td data-label="集数" class="num">{{ s.episodes }}</td>
+            <td data-label="人数" class="num">{{ s.people }}</td>
+            <td data-label="时长" class="num">{% if s.minutes >= 60 %}{{ s.minutes // 60 }} 小时 {{ s.minutes % 60 }} 分{% elif s.minutes %}{{ s.minutes }} 分{% else %}<span class="p na">—</span>{% endif %}</td>
+            <td data-label="看到" class="num">{{ s.seen or "—" }}</td>
+            <td data-label="更新至" class="num">{{ s.available or "—" }}</td>
+            <td data-label="媒体库">{{ s.library }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:24px 0">这天没有观看记录</div>
+      {% endif %}
+    </div>
+
+    <div class="lcard">
+      <h3>新增入库<span>{{ report.additions.groups }} 部 · {{ report.additions.episodes }} 集</span></h3>
+      {% if report.additions.shows %}
+        {% for g in report.additions.shows %}
+        <div class="trow" style="grid-template-columns:28px 1fr auto">
+          {{ poster(g.poster, hue_of(g.show), initial(g.show)) }}
+          <div class="tm2">
+            <b>{{ g.show }}</b>
+            <span class="ts">{{ g.kind }}{% if g.library %} · {{ g.library }}{% endif %}</span>
+          </div>
+          <span class="tt">{{ g.detail }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty" style="padding:24px 0">这天没有新剧集或电影入库</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <h3>日报卡片<span>1080 宽</span></h3>
+      {% if card_ok %}
+      <a href="/card/{{ report.day }}.png" target="_blank" rel="noopener">
+        <img class="cardimg" src="/card/{{ report.day }}.png" alt="日报卡片">
+      </a>
+      <div class="note">企业微信直接发这张图；钉钉 / 飞书 / Server 酱只能带一个签名链接。</div>
+      {% else %}
+      <div class="note">没有找到中文字体，图片不可用。容器里装 <code>fonts-wqy-microhei</code>，
+        或用 <code>CARD_FONT</code> 指向字体文件。</div>
+      {% endif %}
+    </div>
+
+  </aside>
+</div>
+
+<div class="lgrid" style="margin-bottom:16px">
+  <div class="lcard">
+    <h3>推送内容<span>就是发出去的那段</span></h3>
+    <pre class="msg">{{ preview.markdown }}</pre>
+    <div class="note">消息末尾的看板链接来自「看板地址」，留空就不加。</div>
+  </div>
+
+  <div class="lcard">
+    <h3>最近发送<span>{{ logs|length }} 条</span></h3>
+    {% for l in logs %}
+    <div class="logrow">
+      <span class="lt">{{ l.time }}</span>
+      <span class="lu">{{ l.kind_label }} · {{ l.report_day }}</span>
+      <span class="{{ 'ok' if l.ok else 'err' }}">{{ '成功' if l.ok else '失败' }}{% if l.status %} {{ l.status }}{% endif %}</span>
+    </div>
+    {% if l.message %}<div class="note" style="margin:0 0 8px">{{ l.message }}</div>{% endif %}
+    {% else %}
+    <div class="empty" style="padding:18px 0">还没有发送过</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="set">
+  <h2>推送设置</h2>
+  <p class="hint">
+    自动推送由应用内的定时任务发出（每 30 秒检查一次，只发一次）。投递失败会隔 15 分钟重试；
+    超过 12 小时没启动就直接跳过，避免半夜补发早上的日报。
+    「保存并发送测试」会带上最近一天的卡片，企业微商会收到文字和图片两条。
+  </p>
+  <form class="dgrid" method="post" action="/digest/save">
+    <label class="opt chk"><input type="checkbox" name="on" value="1" {{ 'checked' if conf.on }}> 每天自动推送</label>
+    <label class="opt">推送时间<input type="time" name="at" value="{{ conf.at }}"></label>
+    <label class="opt">统计哪一天
+      <select name="mode">
+        <option value="yesterday" {{ 'selected' if conf.mode == 'yesterday' }}>前一天（早上发昨天的日报）</option>
+        <option value="today" {{ 'selected' if conf.mode == 'today' }}>当天（晚上发当天的日报）</option>
+      </select>
+    </label>
+    <label class="opt">推送类型
+      <select name="kind">
+        {% for value, label in kinds %}<option value="{{ value }}" {{ 'selected' if conf.kind == value }}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="wide optrow">
+      <span>推送形式</span>
+      <label><input type="radio" name="form" value="both" {{ 'checked' if conf.form == 'both' }}> 文字 + 图片</label>
+      <label><input type="radio" name="form" value="text" {{ 'checked' if conf.form == 'text' }}> 只发文字</label>
+      <label><input type="radio" name="form" value="image" {{ 'checked' if conf.form == 'image' }}> 只发图片</label>
+    </div>
+    <label class="opt wide">Webhook 地址
+      <input type="text" name="url" value="{{ conf.url }}" placeholder="https://..." autocomplete="off" spellcheck="false">
+    </label>
+    <label class="opt">Telegram 聊天 ID<input type="text" name="chat" value="{{ conf.chat }}" placeholder="只有 Telegram 需要" autocomplete="off"></label>
+    <label class="opt">看板地址<input type="text" name="link" value="{{ conf.link }}" placeholder="http://192.168.1.10:8787，可留空" autocomplete="off"></label>
+    <label class="opt chk"><input type="checkbox" name="skip_empty" value="1" {{ 'checked' if conf.skip_empty }}> 没有观看记录和新入库时不推送</label>
+    <div class="wide form">
+      <button class="btn primary" type="submit">保存设置</button>
+      <button class="btn" type="submit" formaction="/digest/test">保存并发送测试</button>
+    </div>
+  </form>
+
+  <div class="note">
+    <b>各类型要填什么：</b><br>
+    通用 JSON：填任意 HTTPS 地址，POST 的 body 是 <code>{title, markdown, text, day, report, image_base64, card_url}</code>；<br>
+    Server 酱：<code>https://sctapi.ftqq.com/&lt;SendKey&gt;.send</code>；<br>
+    Telegram：<code>https://api.telegram.org/bot&lt;token&gt;/sendMessage</code>，聊天 ID 另填（先用 @userinfobot 查自己的 id），图片暂只发链接；<br>
+    企业微信 / 钉钉 / 飞书：填群机器人给出的 Webhook 地址。钉钉选「自定义关键词」模式即可，加签模式没有实现。
+  </div>
+  <div class="note">
+    <b>图片在各平台的样子：</b><br>
+    企业微信：文字一条 + 图片一条（base64 直传，不依赖外网）；<br>
+    钉钉 / Server 酱：在消息末尾追加图片链接，<b>需要「看板地址」能从这个群成员的手机访问</b>（同一局域网，或你有反向代理）；<br>
+    飞书：自定义机器人不支持内嵌图片，只能给一个「图片：链接」；<br>
+    通用 JSON：直接在 body 里带 <code>image_base64</code> 和 <code>card_url</code>。
+  </div>
+</div>
+
+<div class="note" style="margin:14px 2px 0">
+  时长是「每集播放位置的最大值」求和，属于估算：飞牛只保留每集最后停留的位置，跳过片头或来回拖动都会影响结果。
+  家庭总时长按集去重（两个人同看一集只算一次），所以它可能小于成员时长相加。
+  「新增入库」读的是源库 `item.create_time`，整季导入会一次报一整季的集数。
+  「看到」是全时段的观看进度（取最远一集），「更新至」是媒体库里真实存在的最新一集——两者不是一回事，
+  也都不等于「当天最后一条记录是哪一集」。
+</div>
+{% endblock %}

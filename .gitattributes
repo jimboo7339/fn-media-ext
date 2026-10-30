@@ -1,0 +1,15 @@
+# 仓库里统一存 LF：容器与 CI 都跑在 Linux 上，避免 Windows 带进来 CRLF
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.zip  binary
+*.ttf  binary
+*.ttc  binary
+*.woff binary
+*.woff2 binary

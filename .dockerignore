@@ -1,0 +1,14 @@
+# 构建上下文里不需要的东西
+.git
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+data
+appdata
+tmp
+mockup
+scripts
+docs
+fn-media-ext.zip
+*.md

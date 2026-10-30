@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}数据排行 · 观影时间线{% endblock %}
+{% block heading %}数据排行{% endblock %}
+{% block sub %}全时段 · {{ kpis.events }} 条记录 · {{ kpis.people }} 人 · {{ kpis.shows }} 部剧{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">总时长</div><div class="v">{{ kpis.minutes // 60 }}<small>小时 {{ kpis.minutes % 60 }} 分</small></div></div>
+  <div class="kpi"><div class="k">观看条目</div><div class="v">{{ kpis.events }}<small>条</small></div></div>
+  <div class="kpi"><div class="k">活跃天数</div><div class="v">{{ kpis.days }}<small>天</small></div></div>
+  <div class="kpi"><div class="k">最忙的一天</div><div class="v sm">{{ kpis.busiest }}</div></div>
+</div>
+
+<div class="lgrid">
+  <div class="lcard">
+    <h3>谁看得最多<span>按时长估算</span></h3>
+    {% for u in people %}
+    <a class="rk" href="/user/{{ u.name|urlencode }}" style="grid-template-columns:20px 74px 1fr 96px">
+      <span class="n">{{ loop.index }}</span>
+      <span class="nm">{{ u.name }}</span>
+      <span class="bar"><i style="width:{{ u.pct }}%"></i></span>
+      <span class="v">{{ u.minutes // 60 }} 小时 {{ u.minutes % 60 }} 分</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="lcard">
+    <h3>哪部剧最耗时<span>时长已知的前 {{ by_minutes|length }} 部</span></h3>
+    {% for s in by_minutes %}
+    <a class="rk" href="/show/{{ s.key|urlencode }}" style="grid-template-columns:20px 1fr 1fr 78px">
+      <span class="n">{{ loop.index }}</span>
+      <span class="nm">{{ s.show }}</span>
+      <span class="bar"><i style="width:{{ s.pct }}%"></i></span>
+      <span class="v">{{ s.minutes // 60 }} 小时</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="content">
+  <div class="feed">
+    <div class="lcard">
+      <h3>剧集热度<span>按记录数</span></h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>剧集</th><th>记录</th><th>人数</th><th>已看集数</th><th>时长</th><th>最近</th></tr></thead>
+          <tbody>
+          {% for s in by_events %}
+          <tr>
+            <td data-label="#" class="num">{{ loop.index }}</td>
+            <td data-label="剧集"><a class="lnk" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a>
+              <span class="et">{{ s.library }}</span></td>
+            <td data-label="记录" class="num">{{ s.events }}</td>
+            <td data-label="人数" class="num">{{ s.people }}</td>
+            <td data-label="已看集数" class="num">{{ s.done_eps }} / {{ s.episodes }}</td>
+            <td data-label="时长" class="num">{% if s.minutes %}{{ s.minutes // 60 }} 小时{% else %}<span class="p na">未知</span>{% endif %}</td>
+            <td data-label="最近" class="num">{{ s.last_label }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <h3>成员明细</h3>
+      {% for u in people %}
+      <div style="padding:7px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px">
+          <span class="d" style="width:7px;height:7px;border-radius:50%;background:{{ u.color }}"></span>
+          <a class="lnk" href="/user/{{ u.name|urlencode }}">{{ u.name }}</a>
+          <span style="margin-left:auto;color:var(--dim);font-size:11px">{{ u.events }} 条</span>
+        </div>
+        <div class="note" style="margin:3px 0 0">
+          {{ u.shows_n }} 部剧 · {{ u.episodes }} 集 · {{ u.days_n }} 天 · 首次 {{ u.first_label }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </aside>
+</div>
+
+<div class="note" style="margin:14px 2px 0">
+  时长是把每条记录的播放位置按集取最大值再求和，属于估算：飞牛只保留每集最后停留的位置，跳过片头或来回拖动都会影响结果。
+  有人习惯「标记已看」而不产生播放位置，所以记录的条数排名和时长排名不一定一致。
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 · 观影时间线</title>
+{% from "_macros.html" import themeboot, themebar %}
+{{ themeboot() }}
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{{ themebar("theme-fixed") }}
+<div class="login">
+  <form class="box" method="post" action="/login">
+    <div class="logo">时</div>
+    <h1>观影时间线</h1>
+    <p>仅管理员可访问</p>
+    {% if err %}<div class="err">用户名或密码不正确</div>{% endif %}
+    {% if pw %}<div class="ok">密码已更新，请重新登录</div>{% endif %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>用户名</label>
+    <input type="text" name="username" autofocus autocomplete="username">
+    <label>密码</label>
+    <input type="password" name="password" autocomplete="current-password">
+    <button class="btn primary" type="submit">登录</button>
+  </form>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

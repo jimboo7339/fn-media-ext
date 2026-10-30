@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}{{ name }} · 观影时间线{% endblock %}
+{% block heading %}<span class="avbig" style="color:{{ color }}">{{ mark }}</span>{{ name }}{% endblock %}
+{% block sub %}第一次观看 {{ first }} · 最近 {{ last }}{% endblock %}
+{% block tools %}
+<a class="btn" href="/?u={{ name|urlencode }}">只看 {{ name }} 的时间线</a>
+<a class="btn" href="/">时间线</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">观看记录</div><div class="v">{{ kpis.events }}<small>条</small></div></div>
+  <div class="kpi"><div class="k">活跃天数</div><div class="v">{{ kpis.days }}<small>天</small></div></div>
+  <div class="kpi"><div class="k">在追剧集</div><div class="v">{{ kpis.following }}<small>部</small></div></div>
+  <div class="kpi"><div class="k">观看时长</div>
+    {% if kpis.minutes >= 60 %}
+    <div class="v">{{ kpis.minutes // 60 }}<small>小时 {{ kpis.minutes % 60 }} 分</small></div>
+    {% else %}
+    <div class="v">{{ kpis.minutes }}<small>分钟</small></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="g2">
+  <div class="col">
+  <div class="lcard">
+    <h3>媒体库分布<span>共 {{ kpis.events }} 条</span></h3>
+    <div class="bars">
+      {% for b in libs %}
+      <div class="brow">
+        <span class="bn">{{ b.name }}</span>
+        <span class="bar"><i style="width:{{ b.pct }}%"></i></span>
+        <span class="bv">{{ b.n }} · {{ b.pct }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="lcard">
+    <h3>观看习惯</h3>
+    <div class="kv">
+      <span>连续观看</span><b>最长 {{ streak }} 天{% if streak_now %} · 当前 {{ streak_now }} 天{% endif %}</b>
+      <span>高峰时段</span><b>{{ peak_hour }}</b>
+      <span>观看时长</span><b>约 {{ kpis.minutes // 60 }} 小时</b>
+      <span>整部看完</span><b>{{ finished|length }} 部</b>
+    </div>
+  </div>
+  </div>
+
+  <div class="lcard">
+    <h3>观看时段<span>峰值 {{ peak_hour }}</span></h3>
+    <div class="hrs">
+      {% for h in hours %}{% if h.n %}<i style="height:{{ h.pct }}%" title="{{ h.label }} 时 · {{ h.n }} 条"></i>{% else %}<i class="zero" title="{{ h.label }} 时 · 0 条"></i>{% endif %}{% endfor %}
+    </div>
+    <div class="haxis"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    <div class="bars mt">
+      {% for w in weekdays %}
+      <div class="brow">
+        <span class="bn">{{ w.name }}</span>
+        <span class="bar"><i style="width:{{ w.pct }}%"></i></span>
+        <span class="bv">{{ w.n }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="feed">
+    <div class="lcard">
+      <h3>在追<span>{{ kpis.following }} 部{% if following|length < kpis.following %} · 显示最近 {{ following|length }} 部{% endif %}</span></h3>
+      {% for s in following %}
+      <a class="frow" href="/show/{{ s.key|urlencode }}">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <span class="fm">
+          <b>{{ s.show }}</b>
+          <span class="fs">{{ s.ep }}{% if s.title %} {{ s.title }}{% endif %}</span>
+        </span>
+        <span class="bar"><i style="width:{{ s.pct }}%"></i></span>
+        <span class="ft">{{ s.time }}</span>
+      </a>
+      {% endfor %}
+      {% if not following %}<div class="note">没有未看完的剧</div>{% endif %}
+    </div>
+
+    <div class="lcard">
+      <h3>最近观看<span>{{ recent|length }} 条</span></h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>时间</th><th>内容</th><th>进度</th></tr></thead>
+          <tbody>
+          {% for r in recent %}
+          <tr>
+            <td data-label="时间" class="num">{{ r.time }}</td>
+            <td data-label="内容">
+              <a class="lnk" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>
+              {% if r.ep %}<span class="ep">{{ r.ep }}</span>{% endif %}
+              {% if r.title %}<span class="et">{{ r.title }}</span>{% endif %}
+            </td>
+            <td data-label="进度">
+              {% if r.watched %}<span class="chip">已看</span>
+              {% elif r.pct %}<div class="pg"><div class="bar"><i style="width:{{ r.pct }}%"></i></div><span class="p">{{ r.pct }}%</span></div>
+              {% else %}<span class="p na">—</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <h3>看完的剧<span>{{ finished|length }} 部</span></h3>
+      {% for s in finished %}
+      <div class="now">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <div class="m">
+          <b><a class="lnk" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a></b>
+          <div class="s"><span>{{ s.done_eps }} 集</span><span>{{ s.time }}</span></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not finished %}<div class="note">还没有整部看完的剧</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <h3>和谁看得最像<span>共同剧集</span></h3>
+      {% for c in coop %}
+      <div class="duo">
+        <div class="avat"><i style="color:{{ c.color }}">{{ c.initial }}</i></div>
+        <a class="lnk" href="/user/{{ c.name|urlencode }}">{{ c.name }}</a>
+        <span class="n">{{ c.n }} 部</span>
+      </div>
+      {% endfor %}
+      {% if not coop %}<div class="note">没有重叠的观看记录</div>{% endif %}
+    </div>
+  </aside>
+</div>
+
+<div class="note" style="margin:4px 2px 0">
+  观看时长按每集记录的最大播放进度估算，不是实际播放耗时；「在追」指最近一次记录尚未标记看完的剧。
+</div>
+{% endblock %}

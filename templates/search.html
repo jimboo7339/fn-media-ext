@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}搜索 · 观影时间线{% endblock %}
+{% block heading %}搜索{% endblock %}
+{% block sub %}{% if q %}「{{ q }}」的结果{% else %}共 {{ total_events }} 条记录 · {{ total_shows }} 部剧集{% endif %}{% endblock %}
+
+{% block content %}
+{% if not q %}
+  <div class="lcard" style="margin-bottom:14px">
+    <h3>常看的剧<span>按记录数</span></h3>
+    <div class="chips">
+      {% for s in hot %}
+      <a class="chipbtn" href="/show/{{ s.key|urlencode }}">{{ s.show }}<span class="c">{{ s.events }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="lcard">
+    <h3>成员<span>{{ members|length }} 人</span></h3>
+    <div class="chips">
+      {% for u in members %}
+      <a class="chipbtn" href="/user/{{ u.name|urlencode }}">
+        <span class="d" style="background:{{ u.color }}"></span>{{ u.name }}<span class="c">{{ u.events }} 条</span></a>
+      {% endfor %}
+    </div>
+    <div class="note">搜索支持剧名、单集标题、季集编号（如 S01E14）和成员名。按 <b class="strong">/</b> 可以随时跳到这个搜索框。</div>
+  </div>
+
+{% else %}
+  {% if not shows and not users and not events %}
+  <div class="empty">没有找到「{{ q }}」</div>
+  {% endif %}
+
+  {% if shows %}
+  <div class="lcard" style="margin-bottom:14px">
+    <h3>剧集<span>{{ shows|length }} 部</span></h3>
+    <div class="sgrid">
+      {% for s in shows %}
+      <a class="scard" href="/show/{{ s.key|urlencode }}">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <span class="sm2"><b>{{ s.show }}</b>
+          <span class="ss">{{ s.library }} · {{ s.events }} 条 · {{ s.people }} 人</span></span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if users %}
+  <div class="lcard" style="margin-bottom:14px">
+    <h3>成员<span>{{ users|length }} 人</span></h3>
+    <div class="chips">
+      {% for u in users %}
+      <a class="chipbtn" href="/user/{{ u.name|urlencode }}">
+        <span class="d" style="background:{{ u.color }}"></span>{{ u.name }}<span class="c">{{ u.events }} 条 · {{ u.minutes // 60 }} 小时</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if events %}
+  <div class="lcard">
+    <h3>观看记录<span>{{ event_total }} 条{% if event_total > events|length %} · 显示前 {{ events|length }} 条{% endif %}</span></h3>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>时间</th><th>内容</th><th>用户</th><th>进度</th></tr></thead>
+        <tbody>
+        {% for r in events %}
+        <tr>
+          <td data-label="时间" class="num">{{ r.time }}</td>
+          <td data-label="内容">
+            <a class="lnk" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>
+            {% if r.ep %}<span class="ep">{{ r.ep }}</span>{% endif %}
+            {% if r.title %}<span class="et">{{ r.title }}</span>{% endif %}
+          </td>
+          <td data-label="用户"><span class="who"><span class="d" style="background:{{ r.color }}"></span>
+            <a class="lnk" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a></span></td>
+          <td data-label="进度">
+            {% if r.watched %}<span class="chip">已看</span>
+            {% elif r.pct %}<div class="pg"><div class="bar"><i style="width:{{ r.pct }}%"></i></div><span class="p">{{ r.pct }}%</span></div>
+            {% else %}<span class="p na">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

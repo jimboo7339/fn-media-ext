@@ -1,0 +1,124 @@
+{% from "_macros.html" import poster %}
+<div data-watching="{{ live.counts.watching }}">
+
+{% if live.mode == 'snapshot' %}
+<div class="banner">直连源库失败，当前读取的是快照数据，最多滞后 {{ live.snapshot_lag }} 分钟。想让这一页反映秒级状态，需要让容器能直接只读打开数据库目录。</div>
+{% elif live.mode == 'none' %}
+<div class="banner bad">源数据库不可读：{{ live.error }}</div>
+{% endif %}
+
+<div class="kpis">
+  <div class="kpi"><div class="k">正在观看</div><div class="v">{{ live.counts.watching }}<small>路</small></div></div>
+  <div class="kpi"><div class="k">30 分钟活跃</div><div class="v">{{ live.counts.active }}<small>人</small></div></div>
+  <div class="kpi"><div class="k">今日播放</div><div class="v">{{ live.counts.today }}<small>条</small></div></div>
+  <div class="kpi"><div class="k">在线设备</div><div class="v">{{ live.counts.devices }}<small>台</small></div></div>
+</div>
+
+<div class="lcard" style="margin-bottom:14px">
+  <h3>正在观看<span>{% if live.watching %}{{ live.watching|length }} 路 · {% endif %}{{ live.stamp }}</span></h3>
+  {% if live.watching %}
+  <div class="wgrid">
+    {% for w in live.watching %}
+    <div class="wcard">
+      {{ poster(w.poster, w.hue, w.initial) }}
+      <div class="wbody">
+        <div class="wtop"><span class="udot" style="background:{{ w.color }}"></span>
+          <b>{% if w.key %}<a class="lnk" href="/show/{{ w.key|urlencode }}">{{ w.show }}</a>{% else %}{{ w.show }}{% endif %}</b></div>
+        <div class="wep">{% if w.episode %}<span class="e">{{ w.episode }}</span>{% endif %}{{ w.episode_title }}</div>
+        <div class="bar"><i style="width:{{ w.pct or 0 }}%"></i></div>
+        <div class="wmeta">
+          <span class="pct">{{ w.pct or 0 }}%</span>
+          <span>{{ w.position }}{% if w.duration %} / {{ w.duration }}{% endif %}</span>
+          {% if w.resolution %}<span class="badge">{{ w.resolution }}</span>{% endif %}
+          {% if w.mbps %}<span>{{ w.mbps }} Mbps</span>{% endif %}
+          <span>{{ w.ago }}更新</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    现在没有正在播放的节目
+    {% if live.last_seen_text %}<div class="note">最近一次观看：{{ live.last_seen_text }}</div>{% endif %}
+  </div>
+  {% if live.recent %}
+  {% set last = live.recent[0] %}
+  <div class="wgrid">
+    <div class="wcard dim">
+      {{ poster(last.poster, last.hue, last.initial) }}
+      <div class="wbody">
+        <div class="wtop"><span class="udot" style="background:{{ last.color }}"></span>
+          <b>{% if last.key %}<a class="lnk" href="/show/{{ last.key|urlencode }}">{{ last.show }}</a>{% else %}{{ last.show }}{% endif %}</b>
+          <span class="badge" style="margin-left:auto">上次</span></div>
+        <div class="wep">{% if last.episode %}<span class="e">{{ last.episode }}</span>{% endif %}{{ last.episode_title }}</div>
+        <div class="bar"><i style="width:{{ last.pct or 0 }}%"></i></div>
+        <div class="wmeta">
+          <span class="pct">{% if last.watched %}已看完{% elif last.pct %}{{ last.pct }}%{% else %}—{% endif %}</span>
+          <span><a class="lnk" href="/user/{{ last.user|urlencode }}">{{ last.user }}</a></span>
+          <span>{{ last.ago }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="lgrid">
+  <div class="lcard">
+    <h3>最近播放<span>{{ live.recent|length }} 条</span></h3>
+    {% if live.recent %}
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>时间</th><th>用户</th><th>内容</th><th>进度</th></tr></thead>
+      <tbody>
+      {% for r in live.recent %}
+        <tr>
+          <td data-label="时间" class="num" style="white-space:nowrap">{{ r.ago }}</td>
+          <td data-label="用户"><span class="who"><span class="d" style="background:{{ r.color }}"></span>
+            <a class="lnk" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a></span></td>
+          <td data-label="内容">
+            <b style="font-weight:500">{% if r.key %}<a class="lnk" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>{% else %}{{ r.show }}{% endif %}</b>
+            {% if r.episode %}<span class="num" style="margin-left:5px">{{ r.episode }}</span>{% endif %}
+          </td>
+          <td data-label="进度" class="num" style="white-space:nowrap">
+            {% if r.watched %}<span class="chip">已看</span>{% elif r.pct %}{{ r.pct }}%{% else %}—{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <div class="empty">还没有播放记录</div>
+    {% endif %}
+  </div>
+
+  <div class="lcard">
+    <h3>设备与客户端<span>{% if live.active %}30 分钟内活跃：{{ live.active|join('、', attribute='user') }}{% else %}12 小时内登录{% endif %}</span></h3>
+    {% if live.devices %}
+    {% set has_dev = live.devices|selectattr("device")|list %}
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>账号</th><th>客户端</th>{% if has_dev %}<th>设备</th>{% endif %}<th>IP</th><th>最近活跃</th></tr></thead>
+      <tbody>
+      {% for d in live.devices %}
+        <tr>
+          <td data-label="账号"><span class="who"><span class="d" style="background:{{ color_of(d.user) }}"></span>
+            <a class="lnk" href="/user/{{ d.user|urlencode }}">{{ d.user }}</a></span></td>
+          <td data-label="客户端">{{ d.client }}</td>
+          {% if has_dev %}<td data-label="设备" class="num">{{ d.device }}</td>{% endif %}
+          <td data-label="IP" class="num">{{ d.ip }}</td>
+          <td data-label="最近活跃" class="num" style="white-space:nowrap">{{ d.ago }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <div class="empty">12 小时内没有设备登录记录</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="note" style="margin:12px 2px 0">
+  数据来自飞牛影视的播放进度表、访问日志和登录令牌，均为只读查询。IP 只显示前三段；没有人播放时这一页只反映最近一次状态。
+</div>
+</div>

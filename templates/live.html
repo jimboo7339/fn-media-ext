@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}实时 · 观影时间线{% endblock %}
+{% block heading %}实时在线{% endblock %}
+{% block sub %}播放进度每 5 分钟内仍在上报即视为“正在看” · 每 10 秒自动刷新{% endblock %}
+{% block tools %}
+<div class="livebar">
+  <span class="dot-live {{ '' if live.counts.watching else 'idle' }}" id="live-dot"></span>
+  <span id="live-mode">{{ '有人正在观看' if live.counts.watching else '当前无人观看' }}</span>
+  <button class="btn ghost" id="live-pause" type="button">暂停刷新</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="live">{% include "_live.html" %}</div>
+{% endblock %}

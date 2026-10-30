@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>初始化 · 观影时间线</title>
+{% from "_macros.html" import themeboot, themebar %}
+{{ themeboot() }}
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{{ themebar("theme-fixed") }}
+<div class="login">
+  <form class="box" method="post" action="/setup">
+    <div class="logo">时</div>
+    <h1>初始化管理员</h1>
+    <p>第一次启动，请创建唯一的登录账号。</p>
+    {% if err %}<div class="err">创建失败：用户名不能为空，密码至少 6 位</div>{% endif %}
+    <label>用户名</label>
+    <input type="text" name="username" value="admin" autofocus autocomplete="username">
+    <label>密码</label>
+    <input type="password" name="password" autocomplete="new-password">
+    <button class="btn primary" type="submit">创建并登录</button>
+  </form>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

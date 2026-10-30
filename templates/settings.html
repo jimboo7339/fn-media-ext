@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}设置 · 观影时间线{% endblock %}
+{% block heading %}设置{% endblock %}
+{% block sub %}数据源与排除项{% endblock %}
+{% block tools %}
+<form method="post" action="/settings/refresh">
+  <button class="btn" type="submit">立即同步</button>
+</form>
+{% endblock %}
+
+{% block content %}
+{% if done %}<div class="ok" style="margin-bottom:12px">已保存</div>{% endif %}
+{% if pw_changed == 'err' %}<div class="err" style="margin-bottom:12px">原密码不正确，或新密码少于 6 位</div>{% endif %}
+{% if sync_result == 'ok' %}<div class="ok" style="margin-bottom:12px">同步完成</div>{% endif %}
+{% if sync_result == 'err' %}<div class="err" style="margin-bottom:12px">同步失败，详见下方错误信息</div>{% endif %}
+
+<div class="set">
+  <h2>排除项</h2>
+  <p class="hint">被排除的媒体库或账号不会出现在时间线与矩阵里，数据本身仍然保留。首次启动时的预置排除项由环境变量 <b>EXCLUDE_DEFAULT_LIBRARY</b> / <b>EXCLUDE_DEFAULT_ACCOUNT</b> 指定。</p>
+  <div class="grp" style="margin-top:0">媒体库</div>
+  <div class="chips">
+    {% for item in libraries %}
+    <form method="post" action="/settings/toggle">
+      <input type="hidden" name="scope" value="library">
+      <input type="hidden" name="target" value="{{ item.name }}">
+      <button class="chipbtn {{ 'on' if item.excluded }}" type="submit">{{ item.name }}<span class="c">{{ item.events }}</span></button>
+    </form>
+    {% endfor %}
+  </div>
+  <div class="grp">账号</div>
+  <div class="chips">
+    {% for item in accounts %}
+    <form method="post" action="/settings/toggle">
+      <input type="hidden" name="scope" value="account">
+      <input type="hidden" name="target" value="{{ item.name }}">
+      <button class="chipbtn {{ 'on' if item.excluded }}" type="submit">{{ item.name }}<span class="c">{{ item.events }}</span></button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="set">
+  <h2>数据源</h2>
+  <p class="hint">源数据库以只读方式打开，先复制快照再查询，绝不写回飞牛影视。</p>
+  <div class="kv">
+    <span>数据库目录</span><b>{{ db_dir }}</b>
+    <span>海报目录</span><b>{{ img_root }}</b>
+    <span>应用数据</span><b>{{ data_dir }}</b>
+    <span>最近同步</span><b>{{ sync_time }}</b>
+    <span>观看记录</span><b>{{ sync_state.events or 0 }} 条</b>
+    <span>剧集 / 电影</span><b>{{ sync_state.shows or 0 }} 部</b>
+    <span>海报可解析</span><b>{{ poster_stats.ok }} / {{ poster_stats.total }}{% if not poster_stats.exists %}（目录不存在）{% endif %}</b>
+    <span>图片索引</span><b>{{ poster_stats.index }} 个文件</b>
+  </div>
+  {% if sync_state.error %}<p class="err" style="margin-top:12px">上次同步错误：{{ sync_state.error }}</p>{% endif %}
+</div>
+
+<div class="set">
+  <h2>账号</h2>
+  <p class="hint">当前登录：<b>{{ account.username }}</b>。修改密码后需要重新登录。</p>
+  <form class="form" method="post" action="/settings/password">
+    <input type="password" name="old" placeholder="当前密码" autocomplete="current-password">
+    <input type="password" name="new" placeholder="新密码（至少 6 位）" autocomplete="new-password">
+    <button class="btn" type="submit">修改密码</button>
+  </form>
+</div>
+{% endblock %}

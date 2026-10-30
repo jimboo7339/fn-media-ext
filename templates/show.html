@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}{{ head.title }} · 观影时间线{% endblock %}
+{% block heading %}{{ head.title }}{% endblock %}
+{% block sub %}{{ head.kind }} · {{ head.library }}{% if head.genres %} · {{ head.genres }}{% endif %} · {{ kpis.people }} 人看过{% endblock %}
+{% block tools %}<a class="btn" href="/matrix">剧集矩阵</a>{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">观看人数</div><div class="v">{{ kpis.people }}<small>人</small></div></div>
+  <div class="kpi"><div class="k">观看记录</div><div class="v">{{ kpis.events }}<small>条</small></div></div>
+  {% if is_movie %}
+  <div class="kpi"><div class="k">最近进度</div><div class="v">{% if kpis.watched %}<span class="sm">已看完</span>{% elif kpis.pct %}{{ kpis.pct }}<small>%</small>{% else %}<span class="sm">无进度记录</span>{% endif %}</div></div>
+  {% else %}
+  <div class="kpi"><div class="k">已看集数</div><div class="v">{{ kpis.done }}{% if kpis.total %}<small>/ {{ kpis.total }}</small>{% else %}<small>集</small>{% endif %}</div></div>
+  {% endif %}
+  <div class="kpi"><div class="k">首次观看</div><div class="v sm">{{ kpis.first }}</div></div>
+</div>
+
+<div class="shhd">
+  {{ poster(head.poster, head.hue, head.initial, 'big') }}
+  <div class="shcol">
+    <div class="shtop"><b>谁在看</b><span class="note" style="margin:0">进度条为看到的集数占比</span></div>
+    <div class="viewers">
+      {% for p in people %}
+      <a class="vrow" href="/user/{{ p.name|urlencode }}">
+        <span class="vd" style="background:{{ p.color }}"></span>
+        <span class="vn">{{ p.name }}</span>
+        <span class="vs">
+          {%- if is_movie -%}
+            {% if p.done %}已看完{% elif p.pct %}看到 {{ p.pct }}%{% else %}没有进度记录{% endif %} · 最近 {{ p.last_label }}
+          {%- else -%}
+            {% if p.far %}看到 {{ p.far }} · {% endif %}已看 {{ p.done }} 集 · 最近 {{ p.last_label }}
+          {%- endif -%}
+        </span>
+        <span class="bar"><i style="width:{{ p.pct }}%"></i></span>
+        <span class="vp">{{ p.pct }}%</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="feed">
+    {% if eps %}
+    <div class="lcard">
+      <h3>分集明细<span>{{ eps|length }} 集有记录</span></h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>集</th><th>标题</th><th>观看人</th><th>进度</th><th>最近</th></tr></thead>
+          <tbody>
+          {% for e in eps %}
+          <tr>
+            <td data-label="集" class="num">{{ e.label or '—' }}</td>
+            <td data-label="标题">{{ e.title or '—' }}</td>
+            <td data-label="观看人">
+              <div class="avat">
+                {% for u in e.people[:6] %}<i style="color:{{ u.color }}" title="{{ u.name }}">{{ u.initial }}</i>{% endfor %}
+                {% if e.people|length > 6 %}<i>+{{ e.people|length - 6 }}</i>{% endif %}
+              </div>
+            </td>
+            <td data-label="进度">
+              {% if e.done %}<span class="chip">已看</span>
+              {% elif e.pct %}<div class="pg"><div class="bar"><i style="width:{{ e.pct }}%"></i></div><span class="p">{{ e.pct }}%</span></div>
+              {% else %}<span class="p na">—</span>{% endif %}
+            </td>
+            <td data-label="最近" class="num">{{ e.time }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if is_movie %}
+    <div class="lcard">
+      <h3>观看记录<span>{{ recent|length }} 条</span></h3>
+      {% for r in recent %}
+      <div class="logrow">
+        <span class="lt">{{ r.time }}</span>
+        <span class="lu" style="color:inherit"><span class="d" style="background:{{ r.color }}"></span>
+          <a class="lnk" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a>
+          {% if r.pct %}<span class="note" style="margin:0">{{ r.pct }}%</span>{% endif %}
+        </span>
+        {% if r.watched %}<span class="chip">已看</span>{% else %}<span class="lt">{{ r.day }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if eps %}
+  <aside class="rail">
+    <div class="card">
+      <h3>最近观看<span>{{ recent|length }} 条</span></h3>
+      {% for r in recent %}
+      <div class="logrow">
+        <span class="lt">{{ r.time }}</span>
+        <span class="lu"><span class="d" style="background:{{ r.color }}"></span>
+          <a class="lnk" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a>
+          {% if r.ep %}<span class="note" style="margin:0">{{ r.ep }}</span>{% endif %}
+        </span>
+        {% if r.watched %}<span class="chip">已看</span>
+        {% elif r.pct %}<span class="lt">{{ r.pct }}%</span>
+        {% else %}<span class="lt">—</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </aside>
+  {% endif %}
+</div>
+
+<div class="note" style="margin:4px 2px 0">
+  {% if eps %}
+  进度为播放位置与片长之比；「已看」来自飞牛影视的标记或进度 ≥98%。全剧共 {{ kpis.total or '—' }} 集，这里只列出有观看记录的 {{ eps|length }} 集。
+  {% else %}
+  进度为播放位置与片长之比；「已看」来自飞牛影视的标记或进度 ≥98%。电影没有分集，这里只有观看流水。
+  {% endif %}
+</div>
+{% endblock %}

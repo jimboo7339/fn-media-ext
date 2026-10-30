@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>{% block title %}观影时间线{% endblock %}</title>
+{% from "_macros.html" import themeboot, themebar %}
+{{ themeboot() }}
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <button class="iconbtn" id="menu-btn" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="side">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a class="tbrand" href="/"><span class="logo">时</span>观影时间线</a>
+  <span class="spacer"></span>
+  <a class="iconbtn" href="/search" aria-label="搜索剧集或成员">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+  </a>
+  <button class="iconbtn" id="theme-cycle" type="button" aria-label="切换主题">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 13.4A8 8 0 1 1 10.6 4a6.4 6.4 0 0 0 9.4 9.4z"/></svg>
+  </button>
+</header>
+<div class="scrim" id="scrim"></div>
+<div class="app">
+  <aside class="side" id="side">
+    <button class="drawer-close" id="drawer-close" type="button" aria-label="关闭菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <div class="brand"><div class="logo">时</div><b>观影时间线</b></div>
+    <form class="srch" method="get" action="/search" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+      <input type="search" name="q" id="q" value="{{ q if q is defined else '' }}" placeholder="搜索剧集 / 成员" autocomplete="off" aria-label="搜索">
+    </form>
+
+    <nav class="nav">
+      <a href="/{{ nav_q }}" class="{{ 'on' if page == 'timeline' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>时间线</a>
+      <a href="/live" class="{{ 'on' if page == 'live' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5a7.8 7.8 0 0 0 0 11M17.5 17.5a7.8 7.8 0 0 0 0-11M3.5 3.5a12 12 0 0 0 0 17M20.5 20.5a12 12 0 0 0 0-17"/></svg>实时在线</a>
+      <a href="/matrix{{ nav_q }}" class="{{ 'on' if page == 'matrix' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>剧集矩阵</a>
+      <div class="grp">分析</div>
+      <a href="/dropouts" class="{{ 'on' if page == 'dropouts' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h10M4 19h6"/><path d="M18 15l3 3M21 15l-3 3"/></svg>弃剧分析</a>
+      <a href="/stats" class="{{ 'on' if page == 'stats' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>数据排行</a>
+      <a href="/recap" class="{{ 'on' if page == 'recap' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>月度回顾</a>
+      <a href="/digest" class="{{ 'on' if page == 'digest' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg>每日日报</a>
+      <a href="/libraries" class="{{ 'on' if page == 'libraries' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>媒体库体检</a>
+      <div class="grp">系统</div>
+      <a href="/settings" class="{{ 'on' if page == 'settings' }}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h10M4 12h16M4 17h7"/></svg>设置</a>
+    </nav>
+
+    {% if user_filters is defined %}
+    <div class="grp">用户<span>{{ user_filters|selectattr('on')|list|length }}/{{ user_filters|length }}</span></div>
+    {% for f in user_filters %}
+      <div class="fitem {{ 'on' if f.on else 'off' }}{{ ' cur' if page == 'user' and name is defined and name == f.name }}">
+        <a class="fmain" href="{{ f.href_detail }}" title="查看 {{ f.name }} 的观看详情">
+          <span class="dot" style="background:{{ f.color }}"></span>
+          <span class="nm">{{ f.name }}</span>
+        </a>
+        <span class="cnt">{{ f.count }}</span>
+        <a class="ftgl" href="{{ f.href }}"
+           title="{{ '从时间线里隐藏 ' ~ f.name if f.on else '把 ' ~ f.name ~ ' 放回时间线' }}"
+           aria-label="筛选 {{ f.name }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
+        </a>
+      </div>
+    {% endfor %}
+    <div class="grp">媒体库<span>{{ lib_filters|selectattr('on')|list|length }}/{{ lib_filters|length }}</span></div>
+    {% for f in lib_filters %}
+      <a class="fitem {{ 'on' if f.on else 'off' }}" href="{{ f.href }}" title="{{ '从时间线里隐藏 ' ~ f.name if f.on else '把 ' ~ f.name ~ ' 放回时间线' }}">
+        <span class="dot lib"></span>
+        <span class="nm">{{ f.name }}</span><span class="cnt">{{ f.count }}</span>
+      </a>
+    {% endfor %}
+    {% endif %}
+
+    <div class="foot">
+      {{ themebar() }}
+      只读挂载 · 不修改飞牛影视数据库<br>
+      数据更新至 {{ synced }}<br>
+      {% if account %}{{ account.username }} · <a href="#" onclick="document.getElementById('logout').submit();return false">退出</a>{% endif %}
+    </div>
+    <form id="logout" method="post" action="/logout" style="display:none"></form>
+  </aside>
+
+  <main>
+    <div class="top">
+      <div>
+        <h1>{% block heading %}{% endblock %}</h1>
+        <div class="sub">{% block sub %}{% endblock %}</div>
+      </div>
+      <div class="tools">{% block tools %}{% endblock %}</div>
+    </div>
+    {% if sync_error %}<div class="set" style="max-width:none"><b class="err">同步失败：</b><span class="note">{{ sync_error }}</span></div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<nav class="bottomnav" aria-label="主导航">
+  <a href="/" class="{{ 'on' if page == 'timeline' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>时间线</a>
+  <a href="/live" class="{{ 'on' if page == 'live' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5a7.8 7.8 0 0 0 0 11M17.5 17.5a7.8 7.8 0 0 0 0-11"/></svg>实时</a>
+  <a href="/matrix{{ nav_q }}" class="{{ 'on' if page == 'matrix' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>矩阵</a>
+  <a href="/stats" class="{{ 'on' if page == 'stats' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>排行</a>
+  <button type="button" id="more-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>更多</button>
+</nav>
+<script src="/static/app.js"></script>
+</body>
+</html>

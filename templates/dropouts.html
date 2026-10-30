@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}弃剧分析 · 观影时间线{% endblock %}
+{% block heading %}弃剧分析{% endblock %}
+{% block sub %}最近一次观看停在半途、且已超过 {{ days }} 天没有动静{% endblock %}
+
+{% block tools %}
+<div class="seg">
+  {% for d, label in [(7, '7 天'), (30, '30 天'), (90, '90 天'), (180, '180 天')] %}
+  <a class="{{ 'on' if days == d }}" href="/dropouts?d={{ d }}">{{ label }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">被搁置的剧</div><div class="v">{{ total }}<small>条</small></div></div>
+  <div class="kpi"><div class="k">涉及人数</div><div class="v">{{ people }}<small>人</small></div></div>
+  <div class="kpi"><div class="k">涉及剧集</div><div class="v">{{ shows }}<small>部</small></div></div>
+  <div class="kpi"><div class="k">平均搁置</div><div class="v">{{ avg_idle }}<small>天</small></div></div>
+</div>
+
+{% if not total %}
+<div class="empty">{{ days }} 天内没有搁置的剧——要么都在追，要么弃得太久超出了这个窗口</div>
+{% else %}
+<div class="content">
+  <div class="feed">
+    <div class="lcard">
+      <h3>搁置清单<span>{{ rows|length }}{% if total > rows|length %} / {{ total }}{% endif %} 条</span></h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>搁置</th><th>剧集</th><th>看过</th><th>已看</th><th>用户</th><th>进度</th><th>最后观看</th></tr></thead>
+          <tbody>
+          {% for r in rows %}
+          <tr>
+            <td data-label="搁置" class="num">{{ r.idle }} 天</td>
+            <td data-label="剧集">
+              <a class="lnk" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>
+              {% if r.ep %}<span class="ep">{{ r.ep }}</span>{% endif %}
+            </td>
+            <td data-label="看过" class="num">{{ r.episodes }} 集</td>
+            <td data-label="已看" class="num">{{ r.done_eps }} 集</td>
+            <td data-label="用户"><span class="who"><span class="d" style="background:{{ r.color }}"></span>
+              <a class="lnk" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a></span></td>
+            <td data-label="进度">
+              {% if r.pct %}<div class="pg"><div class="bar"><i style="width:{{ r.pct }}%"></i></div><span class="p">{{ r.pct }}%</span></div>
+              {% else %}<span class="p na">—</span>{% endif %}
+            </td>
+            <td data-label="最后观看" class="num">{{ r.last_label }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <h3>弃得最多的人<span>按条数</span></h3>
+      {% for u in user_rows %}
+      <a class="rk" href="/user/{{ u.name|urlencode }}" style="grid-template-columns:20px 1fr 60px">
+        <span class="n">{{ loop.index }}</span>
+        <span class="nm">{{ u.name }}</span>
+        <span class="v">{{ u.n }} 条</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h3>被弃最多的剧<span>按人数</span></h3>
+      {% for s in show_rows %}
+      <div class="rk" style="grid-template-columns:20px 1fr 60px">
+        <span class="n">{{ loop.index }}</span>
+        <span class="nm"><a class="lnk" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a></span>
+        <span class="v">{{ s.n }} 人</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if library_rows %}
+    <div class="card">
+      <h3>按媒体库<span>{{ library_rows|length }} 个</span></h3>
+      {% for name, n in library_rows %}
+      <div class="rk" style="grid-template-columns:1fr 60px">
+        <span class="nm">{{ name }}</span>
+        <span class="v">{{ n }} 条</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+<div class="note" style="margin:14px 2px 0">
+  「搁置」= 该用户这部剧的最后一条记录没有标记已看、进度也没到 98%，且已经超过 {{ days }} 天没有新记录。
+  「看过」是有播放记录的集数，「已看」是其中被标记看完（或进度 ≥98%）的集数——所以「看过 24 集 · 已看 0 集」和「看过 1 集 · 已看 0 集」是两种完全不同的搁置。
+  整部看完的剧不会出现在这里；标记已看是单集行为，所以这里看的是「最后停在哪儿」。
+</div>
+{% endif %}
+{% endblock %}

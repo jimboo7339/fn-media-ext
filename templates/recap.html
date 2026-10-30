@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}{{ label }}回顾 · 观影时间线{% endblock %}
+{% block heading %}{{ label }}回顾{% endblock %}
+{% block sub %}{% if not empty %}{{ kpis.events }} 条记录 · {{ kpis.people }} 人 · {{ kpis.days }} 个活跃日{% endif %}{% endblock %}
+
+{% block tools %}
+<div class="seg">
+  <a class="{{ 'on' if mode == 'month' }}" href="/recap?mode=month{{ '&p=' ~ period if mode == 'month' else '' }}">月度</a>
+  <a class="{{ 'on' if mode == 'year' }}" href="/recap?mode=year&p={{ period[:4] }}">年度</a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if empty %}
+<div class="empty">还没有可回顾的数据</div>
+{% else %}
+
+<div class="kpis">
+  <div class="kpi"><div class="k">观看条目</div>
+    <div class="v">{{ kpis.events }}<small>条</small>{% if kpis.delta_events is not none %}<span class="dlt {{ 'up' if kpis.delta_events >= 0 else 'down' }}">{{ '+' if kpis.delta_events >= 0 }}{{ kpis.delta_events }}%</span>{% endif %}</div></div>
+  <div class="kpi"><div class="k">观看时长</div>
+    <div class="v">{{ kpis.hours }}<small>小时</small>{% if kpis.delta_minutes is not none %}<span class="dlt {{ 'up' if kpis.delta_minutes >= 0 else 'down' }}">{{ '+' if kpis.delta_minutes >= 0 }}{{ kpis.delta_minutes }}%</span>{% endif %}</div></div>
+  <div class="kpi"><div class="k">参与人数</div><div class="v">{{ kpis.people }}<small>人</small></div></div>
+  <div class="kpi"><div class="k">看过剧集</div><div class="v">{{ kpis.shows }}<small>部</small></div></div>
+</div>
+
+<div class="lgrid">
+  <div class="lcard">
+    <h3>{{ '每日记录' if trend_days else '每月记录' }}<span>峰值 {{ trend|map(attribute='n')|max }} 条</span></h3>
+    <div class="hrs" style="grid-template-columns:repeat({{ trend|length }},1fr)">
+      {% for t in trend %}{% if t.n %}<i style="height:{{ t.pct }}%" title="{{ t.label }} · {{ t.n }} 条"></i>{% else %}<i class="zero" title="{{ t.label }} · 0 条"></i>{% endif %}{% endfor %}
+    </div>
+    <div class="haxis">
+      {% for t in trend %}{% if not trend_days or loop.index0 % 5 == 0 or loop.last %}<span>{{ t.label }}</span>{% endif %}{% endfor %}
+    </div>
+    {% if prev or next %}
+    <div class="note" style="display:flex;gap:10px;align-items:center">
+      {% if prev %}<a class="btn" href="{{ prev[1] }}">‹ {{ prev[0] }}</a>{% endif %}
+      <span style="margin-right:auto">{{ label }}</span>
+      {% if next %}<a class="btn" href="{{ next[1] }}">{{ next[0] }} ›</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="lcard">
+    <h3>成员排行<span>{{ people|length }} 人</span></h3>
+    {% for u in people %}
+    <a class="rk" href="/user/{{ u.name|urlencode }}">
+      <span class="n">{{ loop.index }}</span>
+      <span class="nm">{{ u.name }}</span>
+      <span class="bar"><i style="width:{{ u.events * 100 // u.max_events }}%"></i></span>
+      <span class="v">{{ u.events }} 条</span>
+    </a>
+    {% else %}<div class="note">这个区间没有人观看</div>{% endfor %}
+    <div class="note">
+      {% if busiest %}最热的一天：<b class="strong">{{ busiest.date }}</b>（{{ busiest.weekday }}）· {{ busiest.n }} 条<br>{% endif %}
+      活跃日平均 {{ (kpis.events / kpis.days)|round(1) if kpis.days else 0 }} 条 · 人均 {{ (kpis.events / kpis.people)|round(1) if kpis.people else 0 }} 条
+    </div>
+  </div>
+</div>
+
+<div class="lcard">
+  <h3>最热的剧<span>{{ shows|length }} 部</span></h3>
+  <div class="sgrid">
+    {% for s in shows %}
+    <a class="scard" href="/show/{{ s.key|urlencode }}">
+      {{ poster(s.poster, s.hue, s.initial) }}
+      <span class="sm2"><b>{{ s.show }}</b>
+        <span class="ss">{{ s.events }} 条 · {{ s.people }} 人 · {{ s.minutes }} 分钟</span></span>
+    </a>
+    {% else %}<div class="note">这个区间没有观看记录</div>{% endfor %}
+  </div>
+</div>
+
+{% if fresh %}
+<div class="lcard" style="margin-top:14px">
+  <h3>新开坑<span>{{ fresh|length }} 部</span></h3>
+  <div class="chips">
+    {% for s in fresh %}
+    <a class="chipbtn" href="/show/{{ s.key|urlencode }}">{{ s.show }}<span class="c">{{ s.events }} 条</span></a>
+    {% endfor %}
+  </div>
+  <div class="note">这些剧的第一条观看记录落在 {{ label }}。</div>
+</div>
+{% endif %}
+
+<div class="note" style="margin:14px 2px 0">
+  时长按每集记录的最大播放进度估算；环比只有在上一区间基数足够大时才显示，否则一个 2 条的基数会算出「+17700%」这种没意义的数字。
+</div>
+{% endif %}
+{% endblock %}

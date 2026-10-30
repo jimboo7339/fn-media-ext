@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}剧集矩阵 · 观影时间线{% endblock %}
+{% block heading %}剧集矩阵{% endblock %}
+{% block sub %}全时段 · {{ rows|length }} 部剧 · {{ users|length }} 人{% endblock %}
+
+{% block content %}
+<div class="mxhead">
+  <b>剧集 × 用户</b>
+  <span>单元格为观看集数，横条为最后一集的进度 · 点剧名或用户名查看详情</span>
+</div>
+<div class="tblwrap"><table class="mxt">
+  <thead>
+    <tr>
+      <th>剧集</th>
+      {% for u in users %}<th><a class="lnk" href="/user/{{ u|urlencode }}"><span class="d" style="background:{{ colors[u] }}"></span>{{ u }}</a></th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>
+        <div class="mxs">
+          {{ poster(row.poster, row.hue, row.initial) }}
+          <div class="t">
+            <b><a class="lnk" href="/show/{{ row.key|urlencode }}">{{ row.show }}</a></b>
+            <i>{{ row.genres or '—' }} · {{ row.events }} 条记录</i>
+          </div>
+        </div>
+      </td>
+      {% for c in row.cells %}
+        {% if c %}
+        <td class="mc">
+          <div class="n">{{ c.n }} 集{% if c.ep %}<em>至 E{{ c.ep }}</em>{% endif %}</div>
+          <div class="bar"><i style="width:{{ c.pct if c.pct is not none else 4 }}%"></i></div>
+        </td>
+        {% else %}
+        <td class="mc none">—</td>
+        {% endif %}
+      {% endfor %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if not rows %}<div class="empty">没有可展示的数据</div>{% endif %}
+
+{% if together.total %}
+<div class="lcard" style="margin-top:16px">
+  <h3>一起看 / 撞车<span>{{ together.total }} 组</span></h3>
+  <div class="note" style="margin:0 0 12px">
+    同一天、同一集、两个以上的人。3 小时以内算「几乎同时」，其余只能算「同一天」——差 16 小时不是一起看，页面不把这两件事混为一谈；跨零点的组合直接不计。
+  </div>
+  <div class="tg2">
+    <div>
+      <div class="tgh">几乎同时<span>{{ together.close|length }}</span></div>
+      {% for t in together.close %}
+      <div class="trow">
+        {{ poster(t.poster, t.hue, t.initial) }}
+        <span class="tm2"><b>{{ t.show }}</b><span class="ts">{{ t.ep }} {{ t.title }}</span></span>
+        <span class="avat">{% for u in t.users %}<i style="color:{{ u.color }}" title="{{ u.name }}">{{ u.initial }}</i>{% endfor %}</span>
+        <span class="tt">{{ t.label }}</span>
+      </div>
+      {% else %}<div class="note">这个时间窗内没有</div>{% endfor %}
+    </div>
+    <div>
+      <div class="tgh">同一天<span>{{ together.day|length }}</span></div>
+      {% for t in together.day %}
+      <div class="trow">
+        {{ poster(t.poster, t.hue, t.initial) }}
+        <span class="tm2"><b>{{ t.show }}</b><span class="ts">{{ t.ep }} {{ t.title }}</span></span>
+        <span class="avat">{% for u in t.users %}<i style="color:{{ u.color }}" title="{{ u.name }}">{{ u.initial }}</i>{% endfor %}</span>
+        <span class="tt">{{ t.label }}</span>
+      </div>
+      {% else %}<div class="note">没有</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

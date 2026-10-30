@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}媒体库体检 · 观影时间线{% endblock %}
+{% block heading %}媒体库体检{% endblock %}
+{% block sub %}{{ kpis.libs }} 个媒体库 · {{ kpis.shows }} 部剧 · {{ kpis.events }} 条记录{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">媒体库</div><div class="v">{{ kpis.libs }}<small>个</small></div></div>
+  <div class="kpi"><div class="k">剧集</div><div class="v">{{ kpis.shows }}<small>部</small></div></div>
+  <div class="kpi"><div class="k">观看记录</div><div class="v">{{ kpis.events }}<small>条</small></div></div>
+  <div class="kpi"><div class="k">总时长</div><div class="v">{{ kpis.minutes // 60 }}<small>小时</small></div></div>
+</div>
+
+<div class="lcard" style="margin-bottom:14px">
+  <h3>各媒体库<span>{{ rows|length }} 个</span></h3>
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>媒体库</th><th>记录</th><th>剧集</th><th>人数</th><th>时长</th><th>海报路径</th><th>最近活动</th><th>搁置</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr>
+        <td data-label="媒体库">{{ r.name }}{% if r.name == '未归属' %} <span class="badge">无媒体库归属</span>{% endif %}</td>
+        <td data-label="记录" class="num">{{ r.events }}</td>
+        <td data-label="剧集" class="num">{{ r.shows }}</td>
+        <td data-label="人数" class="num">{{ r.people }}</td>
+        <td data-label="时长" class="num">{{ r.minutes // 60 }} 小时</td>
+        <td data-label="海报路径" class="num">{{ r.poster_n }} / {{ r.shows }}</td>
+        <td data-label="最近活动" class="num">{{ r.last_label }}</td>
+        <td data-label="搁置" class="num">{{ r.idle }} 天</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="lgrid">
+  <div class="lcard">
+    <h3>数据质量<span>能查到的都列出来了</span></h3>
+    <div class="chk">
+      <b>海报文件</b>
+      <span>{{ posters.ok }} / {{ posters.total }} 可解析</span>
+      <span class="{{ 'ok' if posters.ok == posters.total and posters.total else 'bad' }}">
+        {% if not posters.exists %}目录不存在：{{ posters.root }}{% elif posters.ok == 0 %}有路径但没有文件{% else %}部分缺失{% endif %}
+      </span>
+    </div>
+    <div class="chk">
+      <b>时长未知的剧</b><span>{{ no_duration|length }} 部</span>
+      <span>{{ '这些剧算不出进度百分比' if no_duration else '都能算' }}</span>
+    </div>
+    <div class="chk">
+      <b>已删除的媒体库</b><span>{{ lib_health.dead }} 个</span>
+      <span class="{{ 'ok' if not lib_health.dead else 'bad' }}">
+        {%- if lib_health.dead -%}
+          牵连 {{ lib_health.items }} 个条目的归属失效{% if lib_health.orphan_items %}，另有 {{ lib_health.orphan_items }} 个条目没有任何归属{% endif %}
+        {%- else -%}没有{%- endif -%}
+      </span>
+    </div>
+    <div class="chk">
+      <b>跨库重复</b><span>{{ cross|length }} 部</span>
+      <span>{{ '同一部剧出现在多个媒体库，已按 trim_id 合并' if cross else '没有重复' }}</span>
+    </div>
+    <div class="chk">
+      <b>从未被看的媒体库</b><span>{{ empty_libs|length }} 个</span>
+      <span>{{ empty_libs|join('、') if empty_libs else '没有' }}</span>
+    </div>
+    <div class="chk">
+      <b>长期未动</b><span>{{ stale|length }} 部（≥90 天）</span>
+      <span>{{ '最近没有播放记录' if stale else '都在 90 天内有记录' }}</span>
+    </div>
+    <div class="chk">
+      <b>排除项</b>
+      <span>媒体库 {{ excluded_libs|join('、') if excluded_libs else '无' }}</span>
+      <span>账号 {{ excluded_users|join('、') if excluded_users else '无' }}</span>
+    </div>
+    <div class="note">
+      这些检查只反映数据本身，不会修改飞牛影视里的任何内容。
+      {% if lib_health.dead %}
+      <br>「已删除的媒体库」是历史遗留：你以前删掉过 {{ lib_health.dead }} 个媒体库，
+      <code>item_ancestor</code> 里仍留着指向它们的记录，所以这些条目的播放记录没有媒体库归属——
+      不是数据坏了，也不是本应用漏读。
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="lcard">
+    <h3>跨库重复<span>{{ cross|length }} 部</span></h3>
+    {% for c in cross %}
+    <div class="chk" style="display:block">
+      <div><a class="lnk" href="/show/{{ c.key|urlencode }}"><b>{{ c.show }}</b></a></div>
+      <div class="note" style="margin:2px 0 0">{{ c.libs|join(' + ') }}</div>
+    </div>
+    {% else %}<div class="note">没有同一部剧散落在多个媒体库的情况。</div>{% endfor %}
+  </div>
+</div>
+
+<div class="lcard" style="margin-top:14px">
+  <h3>待补全清单<span>{{ meta.thin }} 部待补 · {{ meta.complete }} 部完整</span></h3>
+  <div class="note" style="margin:0 0 10px">
+    飞牛自带的定时刮削只处理「待抓取」的条目，一旦标成已抓取，<b>即使字段是空的也不会再自动重试</b>——
+    所以这些条目就是「值得请求重刮」的候选。
+    最近盘点：{{ meta.checked_label or '—' }}{% if not meta.fresh %}（源库没变化，直接复用上次结论，没有重新扫描）{% endif %}。
+    {% if not meta.posters_checked %}本机没挂到飞牛图片目录，所以这次没有检查海报文件是否真的存在。{% endif %}
+  </div>
+  {% if meta.rows %}
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>剧集</th><th>缺什么</th><th>飞牛抓取状态</th><th>飞牛上次更新</th></tr></thead>
+      <tbody>
+      {% for r in meta.rows %}
+      <tr>
+        <td data-label="剧集">
+          {% if r.show_key.startswith('tt') or r.show_key.startswith('tm') %}
+          <a class="lnk" href="/show/{{ r.show_key|urlencode }}">{{ r.title }}</a>
+          {% else %}{{ r.title }}{% endif %}
+        </td>
+        <td data-label="缺什么">{{ r.missing_labels|join('、') }}</td>
+        <td data-label="飞牛抓取状态" class="num">{{ '已抓取' if r.fetch_status == '1' else '待抓取（飞牛会自己处理）' }}</td>
+        <td data-label="飞牛上次更新" class="num">{{ r.scraped_label }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    规则：简介 / 评分 / 首播或上映日期 / 背景图 / 海报路径 / 海报文件 / 集数（仅剧集）任一为空即算待补全。
+    这里只报告，不会修改飞牛的任何数据。
+  </div>
+  {% else %}
+  <div class="note">当前没有字段不全的条目。</div>
+  {% endif %}
+</div>
+
+<div class="content" style="margin-top:14px">
+  <div class="feed">
+    <div class="lcard">
+      <h3>长期未动<span>≥90 天没有记录</span></h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>剧集</th><th>搁置天数</th></tr></thead>
+          <tbody>
+          {% for s in stale %}
+          <tr>
+            <td data-label="剧集"><a class="lnk" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a></td>
+            <td data-label="搁置天数" class="num">{{ s.days }} 天</td>
+          </tr>
+          {% else %}<tr><td colspan="2" class="note">都还在 90 天内有记录</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <h3>缺时长的剧<span>{{ no_duration|length }} 部</span></h3>
+      {% for s in no_duration %}
+      <div class="rk" style="grid-template-columns:1fr">
+        <span class="nm">{{ s }}</span>
+      </div>
+      {% else %}<div class="note">没有</div>{% endfor %}
+      <div class="note">这些条目的播放进度无法换算成百分比，页面里显示「—」。</div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
