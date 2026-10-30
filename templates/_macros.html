@@ -2,6 +2,12 @@
 <div class="pst {{ cls }}" style="--h:{{ hue }}"><span>{{ initial }}</span>{% if path %}<img src="/img/{{ path }}" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
 {%- endmacro %}
 
+{# 品牌标记：播放三角 + 三个事件节点的时间轴。
+   改这里时同步改 static/favicon.svg 与 scripts/make_icons.py，然后重跑那个脚本。 #}
+{% macro mark() -%}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.6 20.4h14.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".38"/><circle cx="7.2" cy="20.4" r="1.55" fill="currentColor" opacity=".5"/><circle cx="12" cy="20.4" r="1.55" fill="currentColor" opacity=".75"/><circle cx="16.8" cy="20.4" r="1.55" fill="currentColor"/><path d="M8.4 3.4 20 10.7 8.4 18Z" fill="currentColor"/></svg>
+{%- endmacro %}
+
 {# Runs before the stylesheet paints so the chosen theme never flashes. #}
 {% macro themeboot() -%}
 <script>try{var q=(location.search.match(/[?&]theme=(light|dark|auto)/)||[])[1];if(q){localStorage.setItem("fnxt.theme",q)}var p=localStorage.getItem("fnxt.theme")||"auto";var m=window.matchMedia("(prefers-color-scheme: light)").matches;var d=p==="auto"?(m?"light":"dark"):p;var r=document.documentElement;r.setAttribute("data-theme",d);r.setAttribute("data-pref",p)}catch(e){}</script>

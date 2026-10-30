@@ -212,6 +212,8 @@ input,button,select,textarea{font-family:inherit}
   box-shadow:var(--sh-accent),inset 0 1px 0 rgba(255,255,255,.28);
 }
 .brand b{font-size:15px;font-weight:650;letter-spacing:.2px}
+/* 品牌标记（templates/_macros.html 的 mark()）：跟着 .logo 的尺寸缩放 */
+.logo svg{width:64%;height:64%;display:block}
 .nav{display:flex;flex-direction:column;gap:3px;margin-bottom:20px}
 .nav a{
   display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r-sm);

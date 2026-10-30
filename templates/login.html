@@ -4,15 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>登录 · 观影时间线</title>
-{% from "_macros.html" import themeboot, themebar %}
+{% from "_macros.html" import themeboot, themebar, mark %}
 {{ themeboot() }}
 <link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 </head>
 <body>
 {{ themebar("theme-fixed") }}
 <div class="login">
   <form class="box" method="post" action="/login">
-    <div class="logo">时</div>
+    <div class="logo">{{ mark() }}</div>
     <h1>观影时间线</h1>
     <p>仅管理员可访问</p>
     {% if err %}<div class="err">用户名或密码不正确</div>{% endif %}

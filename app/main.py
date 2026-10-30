@@ -470,6 +470,12 @@ def health():
     return JSONResponse(body)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """浏览器默认会直接要 /favicon.ico；模板里虽然声明了 SVG 图标，这里也补一个。"""
+    return FileResponse(config.BASE_DIR / "static" / "favicon.ico")
+
+
 @app.post("/api/refresh")
 def api_refresh():
     return JSONResponse(ingest.sync_all(force=True))

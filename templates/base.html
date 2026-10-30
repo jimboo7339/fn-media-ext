@@ -5,16 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <title>{% block title %}观影时间线{% endblock %}</title>
-{% from "_macros.html" import themeboot, themebar %}
+{% from "_macros.html" import themeboot, themebar, mark %}
 {{ themeboot() }}
 <link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 </head>
 <body>
 <header class="topbar">
   <button class="iconbtn" id="menu-btn" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="side">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
   </button>
-  <a class="tbrand" href="/"><span class="logo">时</span>观影时间线</a>
+  <a class="tbrand" href="/"><span class="logo">{{ mark() }}</span>观影时间线</a>
   <span class="spacer"></span>
   <a class="iconbtn" href="/search" aria-label="搜索剧集或成员">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
@@ -29,7 +32,7 @@
     <button class="drawer-close" id="drawer-close" type="button" aria-label="关闭菜单">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
-    <div class="brand"><div class="logo">时</div><b>观影时间线</b></div>
+    <div class="brand"><div class="logo">{{ mark() }}</div><b>观影时间线</b></div>
     <form class="srch" method="get" action="/search" role="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
       <input type="search" name="q" id="q" value="{{ q if q is defined else '' }}" placeholder="搜索剧集 / 成员" autocomplete="off" aria-label="搜索">
