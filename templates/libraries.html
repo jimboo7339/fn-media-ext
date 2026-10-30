@@ -52,7 +52,7 @@
       <b>已删除的媒体库</b><span>{{ lib_health.dead }} 个</span>
       <span class="{{ 'ok' if not lib_health.dead else 'bad' }}">
         {%- if lib_health.dead -%}
-          牵连 {{ lib_health.items }} 个条目的归属失效{% if lib_health.orphan_items %}，另有 {{ lib_health.orphan_items }} 个条目没有任何归属{% endif %}
+          牵连 {{ lib_health['stale_items'] }} 个条目的归属失效{% if lib_health.orphan_items %}，另有 {{ lib_health.orphan_items }} 个条目没有任何归属{% endif %}
         {%- else -%}没有{%- endif -%}
       </span>
     </div>

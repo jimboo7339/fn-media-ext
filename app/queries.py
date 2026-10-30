@@ -1120,7 +1120,7 @@ def _library_health() -> dict:
     所以这些记录在应用里没有媒体库归属。
     """
     path = config.SNAP_DIR / "trimmedia.db"
-    empty = {"dead": 0, "items": 0, "orphan_items": 0}
+    empty = {"dead": 0, "stale_items": 0, "orphan_items": 0}
     if not path.exists():
         return empty
     try:
@@ -1135,7 +1135,8 @@ def _library_health() -> dict:
                 "SELECT COUNT(*) FROM item i WHERE i.type IN ('TV','Movie','Season','Episode') "
                 "AND NOT EXISTS (SELECT 1 FROM item_ancestor a WHERE a.item_guid = i.guid)"
             ).fetchone()[0]
-            return {"dead": int(dead or 0), "items": int(items or 0), "orphan_items": int(orphan or 0)}
+            return {"dead": int(dead or 0), "stale_items": int(items or 0),
+                    "orphan_items": int(orphan or 0)}
         finally:
             con.close()
     except sqlite3.Error:
