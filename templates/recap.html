@@ -20,7 +20,7 @@
   <div class="kpi"><div class="k">观看条目</div>
     <div class="v">{{ kpis.events }}<small>条</small>{% if kpis.delta_events is not none %}<span class="dlt {{ 'up' if kpis.delta_events >= 0 else 'down' }}">{{ '+' if kpis.delta_events >= 0 }}{{ kpis.delta_events }}%</span>{% endif %}</div></div>
   <div class="kpi"><div class="k">观看时长</div>
-    <div class="v">{{ kpis.hours }}<small>小时</small>{% if kpis.delta_minutes is not none %}<span class="dlt {{ 'up' if kpis.delta_minutes >= 0 else 'down' }}">{{ '+' if kpis.delta_minutes >= 0 }}{{ kpis.delta_minutes }}%</span>{% endif %}</div></div>
+    <div class="v sm">{{ kpis.minutes_label }}{% if kpis.delta_minutes is not none %}<span class="dlt {{ 'up' if kpis.delta_minutes >= 0 else 'down' }}">{{ '+' if kpis.delta_minutes >= 0 }}{{ kpis.delta_minutes }}%</span>{% endif %}</div></div>
   <div class="kpi"><div class="k">参与人数</div><div class="v">{{ kpis.people }}<small>人</small></div></div>
   <div class="kpi"><div class="k">看过剧集</div><div class="v">{{ kpis.shows }}<small>部</small></div></div>
 </div>
@@ -86,7 +86,9 @@
 {% endif %}
 
 <div class="note" style="margin:14px 2px 0">
-  时长按每集记录的最大播放进度估算；环比只有在上一区间基数足够大时才显示，否则一个 2 条的基数会算出「+17700%」这种没意义的数字。
+  时长是估算：每集取「看到的最远位置」，同集去重、扣掉自动跳过的片头片尾，再用「这一集首次
+  打开到下一次播放」的间隔封顶；飞牛不记录播放速度，倍速和拖动只能收窄、无法还原。
+  环比只有在上一区间基数足够大时才显示，否则一个 2 条的基数会算出「+17700%」这种没意义的数字。
 </div>
 {% endif %}
 {% endblock %}

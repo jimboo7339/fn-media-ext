@@ -26,7 +26,7 @@
 
 <div class="kpis">
   <div class="kpi"><div class="k">观看记录</div><div class="v">{{ report.totals.events }}<small>条{% if report.totals.episodes and report.totals.episodes != report.totals.events %} · {{ report.totals.episodes }} 集{% endif %}</small></div></div>
-  <div class="kpi"><div class="k">观看时长</div><div class="v">{% if report.totals.minutes >= 60 %}{{ report.totals.minutes // 60 }}<small>小时 {{ report.totals.minutes % 60 }} 分</small>{% else %}{{ report.totals.minutes }}<small>分</small>{% endif %}</div></div>
+  <div class="kpi"><div class="k">观看时长</div><div class="v sm">{{ report.totals.minutes_label }}</div></div>
   <div class="kpi"><div class="k">参与成员</div><div class="v">{{ report.totals.people }}<small>人 · {{ report.totals.shows }} 部剧</small></div></div>
   <div class="kpi"><div class="k">新增入库</div><div class="v">{{ report.additions.groups }}<small>部 · {{ report.additions.episodes }} 集{% if report.additions.movies %} · {{ report.additions.movies }} 部电影{% endif %}</small></div></div>
 </div>
@@ -215,7 +215,9 @@
 </div>
 
 <div class="note" style="margin:14px 2px 0">
-  时长是「每集播放位置的最大值」求和，属于估算：飞牛只保留每集最后停留的位置，跳过片头或来回拖动都会影响结果。
+  时长是估算：每集取「看到的最远位置」，同集去重、扣掉应用自动跳过的片头片尾，再用
+  「这一集首次打开到下一次播放」的间隔封顶。飞牛不记录播放速度，倍速和拖动只能收窄、
+  无法还原，所以 KPI 上给的是区间，上界就是未修正的位置求和。
   家庭总时长按集去重（两个人同看一集只算一次），所以它可能小于成员时长相加。
   「新增入库」读的是源库 `item.create_time`，整季导入会一次报一整季的集数。
   「看到」是全时段的观看进度（取最远一集），「更新至」是媒体库里真实存在的最新一集——两者不是一回事，

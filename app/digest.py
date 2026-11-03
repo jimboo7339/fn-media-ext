@@ -10,8 +10,10 @@
    15 分钟再试，不会每 30 秒锤一次 webhook；错过当天窗口（超过 12 小时）就直接跳过，
    避免半夜开机时突然收到早上九点的日报。
 
-时长的口径和 `/stats`、`/recap` 一致：每集取「播放位置的最大值」再求和，是估算，不是
-实际播放耗时。家庭总时长按集去重（两个人同看一集只算一次），所以它可能小于成员时长相加。
+时长的口径和 `/stats`、`/recap` 一致，都走 `queries.minutes_of()`：每集取「播放位置的
+最大值」，再按集去重、扣掉应用自动跳过的片头片尾、并用「首次打开到下一次播放事件」
+的间隔封顶。仍然是估算，不是实际播放耗时。家庭总时长按集去重（两个人同看一集只算
+一次），所以它可能小于成员时长相加。
 """
 from __future__ import annotations
 
@@ -169,18 +171,22 @@ def build(day: date) -> dict:
     people: dict[str, dict] = {}
     shows: dict[str, dict] = {}
     titles: dict[str, str] = {}
+    # 时长口径统一走 queries.minutes_of()：按集去重、扣跳片头片尾、墙上时间封顶
+    play = queries.play_minutes(evs)
 
     for e in evs:
         titles[e["show_key"]] = e["show_title"]
+        sec = play.get(queries.ev_key(e), 0.0) * 60
 
         p = people.setdefault(
             e["user_name"],
-            {"name": e["user_name"], "events": 0, "items": set(), "pos": {},
+            {"name": e["user_name"], "events": 0, "items": set(), "seconds": 0.0,
              "shows": defaultdict(int), "eps": defaultdict(list), "last": 0},
         )
         p["events"] += 1
-        p["items"].add(e["item_guid"])
-        p["pos"][e["item_guid"]] = max(p["pos"].get(e["item_guid"], 0), e["position"] or 0)
+        if not e["bulk_group"]:
+            p["items"].add(queries.watchtime.identity(e))   # 同集重复条目只算一集
+        p["seconds"] += sec
         p["shows"][e["show_key"]] += 1
         p["eps"][e["show_key"]].append((e["season"] or 0, e["episode"] or 0))
         p["last"] = max(p["last"], e["event_time"])
@@ -188,14 +194,15 @@ def build(day: date) -> dict:
         s = shows.setdefault(
             e["show_key"],
             {"key": e["show_key"], "show": e["show_title"], "events": 0,
-             "items": set(), "people": set(), "pos": {},
+             "items": set(), "people": set(), "seconds": 0.0,
              "latest": "", "last": 0, "poster": e["poster"] or "",
              "library": e["library"] or "未归属"},
         )
         s["events"] += 1
-        s["items"].add(e["item_guid"])
+        if not e["bulk_group"]:
+            s["items"].add(queries.watchtime.identity(e))
         s["people"].add(e["user_name"])
-        s["pos"][e["item_guid"]] = max(s["pos"].get(e["item_guid"], 0), e["position"] or 0)
+        s["seconds"] += sec
         if e["event_time"] >= s["last"]:
             s["last"] = e["event_time"]
             s["latest"] = queries.episode_label(e)
@@ -223,7 +230,7 @@ def build(day: date) -> dict:
                 "events": p["events"],
                 "episodes": len(p["items"]),
                 "shows_n": len(p["shows"]),
-                "minutes": sum(p["pos"].values()) // 60,
+                "minutes": int(p["seconds"]) // 60,
                 "top_show": titles.get(top_key, ""),
                 "top_key": top_key,
                 "top_eps": _ep_range(sorted(set(p["eps"].get(top_key, [])))) if top_key else "",
@@ -254,7 +261,7 @@ def build(day: date) -> dict:
                 "episodes": len(s["items"]),
                 "people": len(s["people"]),
                 "people_names": sorted(s["people"]),
-                "minutes": sum(s["pos"].values()) // 60,
+                "minutes": int(s["seconds"]) // 60,
                 "last_watched": s["latest"],       # 当天最后一条记录看的集
                 "seen": queries.episode_code(*seen.get(s["key"], (0, 0))),
                 "available": "",                   # 库里更新到第几集，稍后查快照补
@@ -272,12 +279,11 @@ def build(day: date) -> dict:
             s["available"] = queries.episode_code(hit["season"], hit["episode"])
 
     prev_minutes = queries.minutes_of(prev)
-    minutes = queries.minutes_of(evs)
+    minutes, minutes_upper = queries.minutes_range(evs)
     delta_events = delta_minutes = None
     if len(prev) >= 3:  # 基数太小的时候，百分比变化只是噪音
         delta_events = len(evs) - len(prev)
         delta_minutes = minutes - prev_minutes
-
     # 新增入库来自源库快照，不经过 watch_event，所以排除规则要在这里再过一遍
     add = additions.summary(day)
     hidden_libs = db.exclusions()["library"]
@@ -302,6 +308,8 @@ def build(day: date) -> dict:
             "shows": len(shows),
             "people": len(people),
             "minutes": minutes,
+            "minutes_upper": minutes_upper,
+            "minutes_label": queries.range_label(minutes, minutes_upper),
             "delta_events": delta_events,
             "delta_minutes": delta_minutes,
         },

@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from urllib.parse import quote, urlencode
 
-from . import config, db, posters
+from . import config, db, posters, watchtime
 
 PALETTE = ["#5b9cf8", "#f0a44a", "#5fc48a", "#c07ef0", "#e0716f", "#4fc3d9", "#c9a227", "#8f9bb3"]
 WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
@@ -577,6 +577,8 @@ def show_context(show_key: str) -> dict | None:
 
     done_all = {e["item_guid"] for e in evs if e["watched"] or (e["pct"] or 0) >= 98}
     first = min(e["event_time"] for e in evs)
+    # 这一部剧的时长：按集去重（两个人同看一集只算一次）+ 扣跳片头片尾 + 墙上时间封顶
+    show_minutes, show_upper = minutes_range(evs)
     kpis = {
         "people": len(people),
         "events": len(evs),
@@ -584,6 +586,8 @@ def show_context(show_key: str) -> dict | None:
         "total": total if total and not is_movie else 0,
         "pct": head["pct"] or 0,
         "watched": bool(head["watched"]),
+        "minutes": show_minutes,
+        "minutes_upper": show_upper,
         "first": datetime.fromtimestamp(first / 1000, config.TZ).strftime("%Y-%m-%d"),
     }
 
@@ -646,10 +650,9 @@ def user_context(name: str) -> dict | None:
                 break
         streak_now = tail
 
-    position: dict[str, int] = {}
-    for e in evs:
-        position[e["item_guid"]] = max(position.get(e["item_guid"], 0), e["position"] or 0)
-    minutes = sum(position.values()) // 60
+    play = play_minutes(evs)
+    minutes = int(sum(play.values()))
+    raw_minutes = int(raw_minutes_of(evs))
 
     libs = Counter(e["library"] or "未归属" for e in evs)
     lib_rows = [
@@ -727,6 +730,8 @@ def user_context(name: str) -> dict | None:
             "days": len(days),
             "following": len(watching),
             "minutes": minutes,
+            "minutes_upper": raw_minutes,
+            "minutes_label": range_label(minutes, raw_minutes),
         },
         "first": datetime.fromtimestamp(min(e["event_time"] for e in evs) / 1000, config.TZ).strftime("%Y-%m-%d"),
         "last": stamp(max(e["event_time"] for e in evs)),
@@ -751,11 +756,76 @@ def allowed_events() -> list[dict]:
 
 
 def minutes_of(evs: list[dict]) -> int:
-    """Estimated minutes: the furthest position reached per episode, summed."""
-    pos: dict[str, int] = {}
+    """估算时长（分钟）：按集去重、扣掉自动跳过的片头片尾、再按墙上时间封顶。
+
+    口径实现在 ``watchtime`` 里，各页面共用同一份，免得排行和合计对不上。
+    """
+    return watchtime.estimate(evs)["minutes"]
+
+
+def minutes_range(evs: list[dict]) -> tuple[int, int]:
+    """(估算分钟, 未修正的位置求和分钟)。页面用后者标注「上界」。"""
+    got = watchtime.estimate(evs)
+    return got["minutes"], got["raw_minutes"]
+
+
+def hm(minutes: int) -> str:
+    """「4 小时 52 分」这种写法，供卡片和 KPI 用。"""
+    if minutes <= 0:
+        return "0 分"
+    hour, minute = divmod(int(minutes), 60)
+    if not hour:
+        return f"{minute} 分"
+    return f"{hour} 小时 {minute} 分" if minute else f"{hour} 小时"
+
+
+def range_label(minutes: int, upper: int) -> str:
+    """估算区间，紧凑写法：「58–71 小时」。
+
+    上界和估算差不到 1 小时就只显示一个值——那个差是噪声，不是信息。日报卡片那排
+    KPI 只有四分之一宽，所以这里用小时近似，明细留在这个函数之外。
+    """
+    low_h, low_m = divmod(int(minutes), 60)
+    high_h = int(upper) // 60
+    if upper <= minutes or upper - minutes < 60:
+        return hm(minutes)
+    if low_h and high_h and high_h > low_h:
+        return f"{low_h}–{high_h} 小时"
+    if not low_h:
+        return f"{low_m} 分–{hm(int(upper))}"
+    return f"{low_h} 小时–{hm(int(upper))}"
+
+
+def raw_minutes_of(evs: list[dict]) -> int:
+    """未修正的口径（每集最大位置求和），页面上作为上界对照。"""
+    return watchtime.estimate(evs)["raw_minutes"]
+
+
+def play_minutes(evs: list[dict]) -> dict[tuple[str, tuple], float]:
+    """每人每集的估算分钟数，键是 ``(user_name, watchtime.identity(e))``。"""
+    return {k: v / 60.0 for k, v in watchtime.per_group_seconds(evs).items()}
+
+
+def ev_key(e: dict) -> tuple[str, tuple]:
+    """取一条记录在 ``play_minutes()`` 里的键。"""
+    return (e["user_name"], watchtime.identity(e))
+
+
+def minutes_by(evs: list[dict], pick) -> dict:
+    """把每集估算秒数归到某个维度（成员 / 剧 / 媒体库）再求和成分钟。
+
+    ``pick(e)`` 返回这条记录归属的维度键；先按秒累加再整除成分钟，和 ``minutes_of``
+    的口径一致，免得「合计」和「明细相加」差出几分钟。
+    """
+    seconds: dict = defaultdict(float)
+    seen: dict[tuple[str, tuple], dict] = {}
     for e in evs:
-        pos[e["item_guid"]] = max(pos.get(e["item_guid"], 0), e["position"] or 0)
-    return sum(pos.values()) // 60
+        seen.setdefault(ev_key(e), e)
+    for key, sec in watchtime.per_group_seconds(evs).items():
+        e = seen.get(key)
+        if e is not None:
+            seconds[pick(e)] += sec
+    return {k: int(v) // 60 for k, v in seconds.items()}
 
 
 def _show_index(evs: list[dict]) -> list[dict]:
@@ -766,22 +836,23 @@ def _show_index(evs: list[dict]) -> list[dict]:
             {"key": e["show_key"], "show": e["show_title"], "poster": e["poster"] or "",
              "hue": hue_of(e["show_title"]), "initial": initial(e["show_title"]),
              "library": e["library"] or "未归属", "events": 0, "users": set(), "items": set(),
-             "done": set(), "last": 0, "first": 0, "minutes": 0, "pos": {}},
+             "done": set(), "last": 0, "first": 0, "minutes": 0},
         )
         s["events"] += 1
         s["users"].add(e["user_name"])
-        s["items"].add(e["item_guid"])
+        if not e["bulk_group"]:
+            s["items"].add(watchtime.identity(e))   # 同集重复条目只算一集
         s["last"] = max(s["last"], e["event_time"])
         s["first"] = e["event_time"] if not s["first"] else min(s["first"], e["event_time"])
-        s["pos"][e["item_guid"]] = max(s["pos"].get(e["item_guid"], 0), e["position"] or 0)
         if e["watched"] or (e["pct"] or 0) >= 98:
-            s["done"].add(e["item_guid"])
+            s["done"].add(watchtime.identity(e))
+    mins = minutes_by(evs, lambda e: e["show_key"])
     out = []
-    for s in g.values():
+    for key, s in g.items():
         s["people"] = len(s.pop("users"))
         s["episodes"] = len(s.pop("items"))
         s["done_eps"] = len(s.pop("done"))
-        s["minutes"] = sum(s.pop("pos").values()) // 60
+        s["minutes"] = mins.get(key, 0)
         s["last_label"] = stamp(s["last"])
         s["first_label"] = stamp(s["first"])
         out.append(s)
@@ -795,25 +866,26 @@ def _people_index(evs: list[dict]) -> list[dict]:
         u = g.setdefault(
             e["user_name"],
             {"name": e["user_name"], "color": color_of(e["user_name"]), "initial": initial(e["user_name"]),
-             "events": 0, "items": set(), "shows": set(), "days": set(), "pos": {}, "done": set(),
+             "events": 0, "items": set(), "shows": set(), "days": set(), "done": set(),
              "last": 0, "first": 0},
         )
         u["events"] += 1
-        u["items"].add(e["item_guid"])
+        if not e["bulk_group"]:
+            u["items"].add(watchtime.identity(e))   # 同集重复条目只算一集
         u["shows"].add(e["show_key"])
         u["days"].add(day_of(e["event_time"]))
-        u["pos"][e["item_guid"]] = max(u["pos"].get(e["item_guid"], 0), e["position"] or 0)
         u["last"] = max(u["last"], e["event_time"])
         u["first"] = e["event_time"] if not u["first"] else min(u["first"], e["event_time"])
         if e["watched"] or (e["pct"] or 0) >= 98:
-            u["done"].add(e["item_guid"])
+            u["done"].add(watchtime.identity(e))
+    mins = minutes_by(evs, lambda e: e["user_name"])
     out = []
     for u in g.values():
         u["episodes"] = len(u.pop("items"))
         u["shows_n"] = len(u.pop("shows"))
         u["days_n"] = len(u.pop("days"))
         u["done_eps"] = len(u.pop("done"))
-        u["minutes"] = sum(u.pop("pos").values()) // 60
+        u["minutes"] = mins.get(u["name"], 0)
         u["last_label"] = stamp(u["last"])
         u["first_label"] = stamp(u["first"])
         out.append(u)
@@ -930,6 +1002,7 @@ def recap_context(mode: str, period: str) -> dict:
         t["pct"] = round(t["n"] * 100 / peak) if peak else 0
 
     cur_min = minutes_of(cur)
+    cur_upper = raw_minutes_of(cur)
     prev_min = minutes_of(prev)
     cur_n = event_count(cur)
     prev_n = event_count(prev)
@@ -951,6 +1024,8 @@ def recap_context(mode: str, period: str) -> dict:
             "events": cur_n,
             "raw": len(cur),
             "minutes": cur_min,
+            "minutes_upper": cur_upper,
+            "minutes_label": range_label(cur_min, cur_upper),
             "hours": cur_min // 60,
             "people": len({e["user_name"] for e in cur}),
             "days": len(days),
@@ -1050,6 +1125,7 @@ def stats_context() -> dict:
 
     days = Counter(day_of(e["event_time"]) for e in evs)
     busiest = days.most_common(1)[0] if days else None
+    minutes, upper = minutes_range(evs)
     return {
         "people": people,
         "by_events": by_events,
@@ -1057,7 +1133,9 @@ def stats_context() -> dict:
         "kpis": {
             "events": event_count(evs),
             "raw": len(evs),
-            "minutes": minutes_of(evs),
+            "minutes": minutes,
+            "minutes_upper": upper,
+            "minutes_label": range_label(minutes, upper),
             "people": len(people),
             "shows": len(shows),
             "days": len(days),
@@ -1152,13 +1230,12 @@ def library_context() -> dict:
         name = e["library"] or "已删除的媒体库"
         L = libs.setdefault(
             name,
-            {"name": name, "events": 0, "users": set(), "shows": set(), "pos": {}, "last": 0, "first": 0,
+            {"name": name, "events": 0, "users": set(), "shows": set(), "last": 0, "first": 0,
              "posters": set(), "no_pct": 0, "no_title": 0},
         )
         L["events"] += 1
         L["users"].add(e["user_name"])
         L["shows"].add(e["show_key"])
-        L["pos"][e["item_guid"]] = max(L["pos"].get(e["item_guid"], 0), e["position"] or 0)
         L["last"] = max(L["last"], e["event_time"])
         L["first"] = e["event_time"] if not L["first"] else min(L["first"], e["event_time"])
         if e["poster"]:
@@ -1168,6 +1245,7 @@ def library_context() -> dict:
         if e["item_type"] == "Episode" and not e["episode_title"]:
             L["no_title"] += 1
 
+    mins = minutes_by(evs, lambda e: e["library"] or "已删除的媒体库")
     now = now_ms()
     rows = []
     for L in libs.values():
@@ -1175,7 +1253,7 @@ def library_context() -> dict:
         rows.append(
             {
                 "name": L["name"], "events": L["events"], "people": len(L["users"]), "shows": shows_n,
-                "minutes": sum(L["pos"].values()) // 60,
+                "minutes": mins.get(L["name"], 0),
                 "last_label": stamp(L["last"]), "first_label": stamp(L["first"]),
                 "idle": max(0, (now - L["last"]) // config.DAY_MS),
                 "poster_n": len(L["posters"]),
@@ -1205,6 +1283,7 @@ def library_context() -> dict:
     empty_libs = [c["name"] for c in cats["library"] if not c["events"]]
 
     pstats = posters.stats([{"show_key": s["key"], "poster": s["poster"]} for s in index])
+    total_minutes, total_upper = minutes_range(evs)
 
     return {
         "rows": rows,
@@ -1221,6 +1300,8 @@ def library_context() -> dict:
             "libs": len(rows),
             "shows": len(index),
             "events": event_count(evs),
-            "minutes": minutes_of(evs),
+            "minutes": total_minutes,
+            "minutes_upper": total_upper,
+            "minutes_label": range_label(total_minutes, total_upper),
         },
     }

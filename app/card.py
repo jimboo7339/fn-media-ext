@@ -113,12 +113,17 @@ def _mix(a: str, b: str, t: float) -> tuple[int, int, int]:
 
 
 def _hm(minutes: int) -> str:
-    if minutes <= 0:
-        return "0 分"
-    if minutes < 60:
-        return f"{minutes} 分"
-    hour, minute = divmod(minutes, 60)
-    return f"{hour} 小时 {minute} 分" if minute else f"{hour} 小时"
+    """「4 小时 52 分」。口径和页面上一致，实现在 queries.hm()。"""
+    from . import queries          # 延迟导入：queries 那边也用到本模块的常量
+    return queries.hm(minutes)
+
+
+def _fits(draw, candidates: list[str], avail: float, size: int = 40, bold: bool = True) -> str:
+    """从宽到窄挑第一个放得下的写法，都放不下就用最短的那个（宁可挤，不能出格）。"""
+    for text in candidates:
+        if _width(draw, text, size, bold) <= avail:
+            return text
+    return candidates[-1]
 
 
 def _text(draw, xy, text, size, color, bold=False, anchor="la"):
@@ -254,14 +259,20 @@ def render(report: dict) -> bytes | None:
         return _png(img)
 
     # KPI：数值和单位排在同一基线，读起来是「4 小时 52 分」而不是上下两截
+    # 观看时长给的是区间；四分之一宽的格子放不下时逐级退让，绝不画出格子外
+    box_w = (WIDTH - PAD * 2 - GAP * 3) / 4
+    duration = total.get("minutes_label") or _hm(total["minutes"])
+    upper = total.get("minutes_upper")
+    if upper and upper > total["minutes"]:
+        duration = _fits(d, [duration, f"{total['minutes'] // 60}–{upper // 60} 小时",
+                             f"{upper // 60} 小时"], box_w - 44)
     y = 152
     labels = [
         ("观看记录", str(total["events"]), "条"),
-        ("观看时长", _hm(total["minutes"]), ""),
+        ("观看时长", duration, ""),
         ("参与成员", str(total["people"]), "人"),
         ("新增入库", str(add["groups"]), f'部 · {add["episodes"]} 集'),
     ]
-    box_w = (WIDTH - PAD * 2 - GAP * 3) / 4
     for i, (label, value, unit) in enumerate(labels):
         x = PAD + i * (box_w + GAP)
         _panel(d, [x, y, x + box_w, y + 132], radius=18)

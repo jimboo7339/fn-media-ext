@@ -14,11 +14,7 @@
   <div class="kpi"><div class="k">活跃天数</div><div class="v">{{ kpis.days }}<small>天</small></div></div>
   <div class="kpi"><div class="k">在追剧集</div><div class="v">{{ kpis.following }}<small>部</small></div></div>
   <div class="kpi"><div class="k">观看时长</div>
-    {% if kpis.minutes >= 60 %}
-    <div class="v">{{ kpis.minutes // 60 }}<small>小时 {{ kpis.minutes % 60 }} 分</small></div>
-    {% else %}
-    <div class="v">{{ kpis.minutes }}<small>分钟</small></div>
-    {% endif %}
+    <div class="v sm">{{ kpis.minutes_label }}</div>
   </div>
 </div>
 
@@ -141,6 +137,9 @@
 </div>
 
 <div class="note" style="margin:4px 2px 0">
-  观看时长按每集记录的最大播放进度估算，不是实际播放耗时；「在追」指最近一次记录尚未标记看完的剧。
+  观看时长是估算：按每集看到的最远位置计算，同集去重、扣掉应用自动跳过的片头片尾，
+  再用「这一集首次打开到下一次播放」的间隔封顶。飞牛不记录播放速度，所以倍速和拖动
+  只能收窄、无法还原；数字是「内容时长」的上界，不是实际播放耗时。
+  「在追」指最近一次记录尚未标记看完的剧。
 </div>
 {% endblock %}
