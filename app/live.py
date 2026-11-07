@@ -142,8 +142,11 @@ def _build(now: float) -> dict:
     excl = db.exclusions()
 
     def hidden(row) -> bool:
-        """Skip what the timeline skips: 排除的账号/媒体库，以及解析不到条目的行。"""
-        name = users.get(row["user_guid"]) or ""
+        """Skip what the timeline skips: 排除项、已删除账号、解析不到条目的行。"""
+        name = users.get(row["user_guid"])
+        if users and name is None:  # 已删除账号 / user 表里已不存在的 guid
+            return True
+        name = name or ""
         if name in excl["account"] or (row["library"] or config.DEAD_LIBRARY) in excl["library"]:
             return True
         return not row["item_title"] and not row["item_type"]
@@ -247,6 +250,8 @@ def _activity(now: float, users: dict[str, str]) -> tuple[list[dict], list[dict]
             "GROUP BY user_guid, app_name, device ORDER BY last DESC LIMIT 20",
             (int(now - DEVICE_WINDOW),),
         ):
+            if users and row["user_guid"] not in users:  # 已删除账号的登录设备不展示
+                continue
             devices.append(
                 {
                     "user": users.get(row["user_guid"]) or row["user_guid"][:8],
@@ -265,6 +270,8 @@ def _activity(now: float, users: dict[str, str]) -> tuple[list[dict], list[dict]
                 "AND path NOT LIKE '%sys/img%' GROUP BY user_guid ORDER BY last DESC",
                 (int(now - ACTIVE_WINDOW),),
             ):
+                if users and row["user_guid"] not in users:  # 已删除账号的活动不展示
+                    continue
                 name = users.get(row["user_guid"]) or row["user_guid"][:8]
                 active.append(
                     {

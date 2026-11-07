@@ -91,7 +91,7 @@ ls /vol1/@appmeta/trim.media
 
 **批量标记折叠**：同一个人 60 秒内连续标记 ≥5 集，会折叠成一张卡片，不再刷屏（飞牛影视里一次性「标记已看」整季时会出现这种情况）。
 
-**排除**：设置页可以把某个媒体库或某个账号整体排除，时间线和矩阵里都不会出现，源数据不动。首次启动时的预置排除项由 `EXCLUDE_DEFAULT_LIBRARY` / `EXCLUDE_DEFAULT_ACCOUNT` 两个环境变量指定，留空就不排除任何东西。
+**排除**：设置页可以把某个媒体库或某个账号整体排除，时间线和矩阵里都不会出现，源数据不动。首次启动时的预置排除项由 `EXCLUDE_DEFAULT_LIBRARY` / `EXCLUDE_DEFAULT_ACCOUNT` 两个环境变量指定，留空就不排除任何东西。已删除的账号不用手动排除：导入阶段就已经被过滤掉，也不会出现在设置页的账号列表里。
 
 **月度 / 年度回顾**：`/recap`。「这个月你们一共看了 40 条、16 小时，最上头的是《某部剧》」，带每日/每月柱状图、成员排行、新开坑，以及与上一区间的环比。环比只在上一区间基数够大时显示——拿 2 条做基数会算出「+17700%」这种没意义的数字。
 
@@ -123,7 +123,7 @@ ls /vol1/@appmeta/trim.media
 ## 数据是怎么来的
 
 1. 把 `trimmedia.db` / `trimmedia_ext.db` / `trimactivity.db` 用 SQLite 在线备份复制到 `appdata/snap/`（只读挂载下备份失败时退回「复制 db + wal + shm」）；
-2. 只查询快照；
+2. 只查询快照；源库里已删除的账号（`user.status=0` 或用户名带 `_deleted_`）在导入阶段直接丢弃，它们的观看记录、登录设备与活动日志都不进入任何统计（源库保持只读，不做任何修改）；
 3. 把 `item_user_play` 的每一行解析成「剧集 + 单集」：`Episode → Season → TV`，再用 `trim_id`（IMDb/TMDB id）兜底合并同一部剧的不同季、不同媒体库副本。只有 `Episode` 和 `Movie` 的记录会变成事件：`Season` / `TV` 行上的播放记录是「整季/整剧标记」，不指向具体哪一集（飞牛甚至会在 Season 行的 `episode_number` 里写一个比总集数还大的数），照单全收会造出并不存在的 S01E30，所以直接忽略；
 4. 剧名、类型、海报优先取 `item_archive` 里的 TMDB 元数据，缺失时退回 `item` 表；
 5. 进度 = `item_user_play.ts` / 时长，时长依次取 `media_stream.duration` → `item.runtime × 60`；

@@ -56,7 +56,13 @@ def main():
     shows = canon_show(con)
     meta = archive_meta(con)
 
-    users = {g: n for g, n in con.execute("SELECT guid, username FROM user")}
+    # 飞牛删除账号时只把 user.status 置 0 并把名字改成 xxx_deleted_<ts>，
+    # 这些账号不参与任何统计（源库仍以只读方式打开，不做任何修改）。
+    users = {}
+    for g, n, status in con.execute("SELECT guid, username, status FROM user"):
+        if status == 0 or "_deleted_" in (n or ""):
+            continue
+        users[g] = n
     libs = {g: t for g, t in con.execute(
         "SELECT item_guid, (SELECT title FROM item WHERE guid=item_guid) FROM mediadb_config")}
 
@@ -89,6 +95,8 @@ def main():
     events = []
     for (ug, ig, ts, watched, ct, ut, itype, ititle, itrim, sn, en, runtime,
          season_guid, tv_guid, tv_trim, tv_title, lib) in rows:
+        if ug not in users:  # 已删除账号 / user 表里已不存在的 guid：不统计
+            continue
         # resolve show identity
         if itype in ("Episode", "Season", "TV"):
             tid = tv_trim or itrim or ""

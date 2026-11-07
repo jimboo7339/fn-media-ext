@@ -170,12 +170,31 @@ def _duration_map(con: sqlite3.Connection) -> dict[str, int]:
 
 
 def _users(con: sqlite3.Connection) -> dict[str, str]:
+    """Only real, active accounts.
+
+    Trim.media does not remove a deleted account from ``user``: it sets
+    ``status = 0`` and renames it to ``<name>_deleted_<timestamp>``
+    (``default-user-template`` is another such system row). Those rows must
+    never reach a statistic, the account catalog or the exclusion picker.
+
+    Older schemas may lack the ``status`` column, so fall back to a query that
+    still filters the ``_deleted_`` name. An unreadable ``user`` table returns
+    ``{}``; callers then keep their permissive behaviour instead of silently
+    dropping every event.
+    """
     out: dict[str, str] = {}
     try:
-        for row in con.execute("SELECT guid, username FROM user"):
-            out[row["guid"]] = row["username"]
+        rows = con.execute("SELECT guid, username, status FROM user").fetchall()
     except sqlite3.Error:
-        pass
+        try:
+            rows = con.execute("SELECT guid, username, 1 AS status FROM user").fetchall()
+        except sqlite3.Error:
+            return out
+    for row in rows:
+        guid, name, status = row[0], row[1] or "", row[2]
+        if status == 0 or "_deleted_" in name:
+            continue
+        out[guid] = name
     return out
 
 
@@ -226,6 +245,12 @@ def build_events(con: sqlite3.Connection, ext: sqlite3.Connection) -> tuple[list
     rows = con.execute("SELECT * FROM item_user_play WHERE visible = 1").fetchall()
     events: list[dict] = []
     for p in rows:
+        # Deleted accounts (and guids no longer present in `user`) contribute
+        # nothing -- otherwise their plays would be counted under a made-up
+        # 6-character name. `users` is empty only when the source table could
+        # not be read at all; in that case keep the permissive behaviour.
+        if users and p["user_guid"] not in users:
+            continue
         item = items.get(p["item_guid"])
         # Season / TV 行上的播放记录是「整季/整剧标记」，它并不指向某一集：
         # 飞牛会在 Season 行的 episode_number 里写一个数（例如整季 22 集的剧写成 30），
