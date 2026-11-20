@@ -191,6 +191,15 @@
     </label>
     <label class="opt">Telegram 聊天 ID<input type="text" name="chat" value="{{ conf.chat }}" placeholder="只有 Telegram 需要" autocomplete="off"></label>
     <label class="opt">看板地址<input type="text" name="link" value="{{ conf.link }}" placeholder="http://192.168.1.10:8787，可留空" autocomplete="off"></label>
+    <label class="opt">加签密钥 / Secret
+      <input type="text" name="sign_token" value="{{ conf.sign_token }}" placeholder="钉钉加签的 secret、或飞书签名校验的 secret" autocomplete="off" spellcheck="false">
+    </label>
+    <label class="opt">Server 酱 SendKey
+      <input type="text" name="webhook_key" value="{{ conf.webhook_key }}" placeholder="只有 Server 酱需要；填了可只填上面 SendKey 自动拼地址" autocomplete="off" spellcheck="false">
+    </label>
+    <label class="opt">飞书 tenant_access_token
+      <input type="text" name="token" value="{{ conf.token }}" placeholder="飞书选「Token 校验」时填；可选" autocomplete="off" spellcheck="false">
+    </label>
     <label class="opt chk"><input type="checkbox" name="skip_empty" value="1" {{ 'checked' if conf.skip_empty }}> 没有观看记录和新入库时不推送</label>
     <div class="wide form">
       <button class="btn primary" type="submit">保存设置</button>
@@ -201,9 +210,11 @@
   <div class="note">
     <b>各类型要填什么：</b><br>
     通用 JSON：填任意 HTTPS 地址，POST 的 body 是 <code>{title, markdown, text, day, report, image_base64, card_url}</code>；<br>
-    Server 酱：<code>https://sctapi.ftqq.com/&lt;SendKey&gt;.send</code>；<br>
+    Server 酱：<code>https://sctapi.ftqq.com/&lt;SendKey&gt;.send</code>，或只填 SendKey 让它自动拼地址；<br>
     Telegram：<code>https://api.telegram.org/bot&lt;token&gt;/sendMessage</code>，聊天 ID 另填（先用 @userinfobot 查自己的 id），图片暂只发链接；<br>
-    企业微信 / 钉钉 / 飞书：填群机器人给出的 Webhook 地址。钉钉选「自定义关键词」模式即可，加签模式没有实现。
+    企业微信：填群机器人 Webhook 地址即可，无需额外参数；<br>
+    钉钉：填群机器人 Webhook。安全设置选「加签」就把它给的 secret 填到「加签密钥」，会自动按官方算法拼 <code>timestamp&amp;sign</code>；选「自定义关键词」则留空即可（关键词记得填「观影日报」）；<br>
+    飞书：填群机器人 Webhook。安全设置选「签名校验」就把 secret 填到「加签密钥」，会在 body 里带上 <code>timestamp/sign</code>；选「IP 白名单」或「关键词」则留空。
   </div>
   <div class="note">
     <b>图片在各平台的样子：</b><br>

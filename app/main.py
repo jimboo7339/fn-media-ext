@@ -249,10 +249,12 @@ def digest_page(request: Request, day: str = "", sent: str = "", note: str = "",
     )
 
 
-def _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form) -> None:
+def _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form,
+                 sign_token, webhook_key, token) -> None:
     digest.save(
         {"on": on, "at": at, "mode": mode, "kind": kind, "url": url,
-         "chat": chat, "link": link, "skip_empty": skip_empty, "form": form}
+         "chat": chat, "link": link, "skip_empty": skip_empty, "form": form,
+         "sign_token": sign_token, "webhook_key": webhook_key, "token": token}
     )
 
 
@@ -267,8 +269,12 @@ def digest_save(
     link: str = Form(""),
     skip_empty: str = Form(""),
     form: str = Form("both"),
+    sign_token: str = Form(""),
+    webhook_key: str = Form(""),
+    token: str = Form(""),
 ):
-    _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form)
+    _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form,
+                 sign_token, webhook_key, token)
     return RedirectResponse("/digest?saved=1", 303)
 
 
@@ -295,9 +301,13 @@ def digest_test(
     link: str = Form(""),
     skip_empty: str = Form(""),
     form: str = Form("both"),
+    sign_token: str = Form(""),
+    webhook_key: str = Form(""),
+    token: str = Form(""),
 ):
     # 「保存并发送测试」：先存下来，测的就是你刚填的这个地址
-    _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form)
+    _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form,
+                 sign_token, webhook_key, token)
     result = digest.send_test()
     flag = "ok" if result["ok"] else "err"
     note = "测试消息已发出" if result["ok"] else f'测试失败：{result["message"]}'

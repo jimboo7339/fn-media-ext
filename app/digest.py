@@ -27,6 +27,7 @@ import secrets
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -64,6 +65,10 @@ DEFAULTS = {
     "digest_link": "",            # 可选：看板的对外地址，也用来拼图片链接
     "digest_skip_empty": "1",
     "digest_form": "both",        # text / image / both
+    # Webhook 鉴权 / 加签参数。各平台字段不同，按推送类型选用；不用的留空即可：
+    "digest_sign_token": "",      # 钉钉「加签」的 secret、飞书「签名校验」的 secret
+    "digest_webhook_key": "",     # Server 酱的 SendKey（地址不完整时用来拼 URL）
+    "digest_token": "",           # 飞书 tenant_access_token（用/open-apis/…发图时）
 }
 
 LATE_HOURS = 12       # 超过这么久才启动就不再补发
@@ -101,6 +106,9 @@ def settings() -> dict:
     conf["link"] = (conf["digest_link"] or "").strip().rstrip("/")
     conf["skip_empty"] = conf["digest_skip_empty"] == "1"
     conf["form"] = conf["digest_form"] if conf["digest_form"] in ("text", "both", "image") else "both"
+    conf["sign_token"] = (conf["digest_sign_token"] or "").strip()
+    conf["webhook_key"] = (conf["digest_webhook_key"] or "").strip()
+    conf["token"] = (conf["digest_token"] or "").strip()
     return conf
 
 
@@ -123,6 +131,13 @@ def save(form: dict) -> dict:
     db.set_setting("digest_skip_empty", "1" if _truthy(form.get("skip_empty")) else "0")
     pushed = form.get("form", "both")
     db.set_setting("digest_form", pushed if pushed in ("text", "both", "image") else "both")
+    # 鉴权/加签参数：浏览器把预填的值一起提交，正常会覆盖；但万一前端没渲染出来（值为 None），
+    # 不要把已存的密钥清空——只有明确传了字符串才写。
+    for key, name in (("digest_sign_token", "sign_token"),
+                      ("digest_webhook_key", "webhook_key"),
+                      ("digest_token", "token")):
+        if name in form and form.get(name) is not None:
+            db.set_setting(key, (form.get(name) or "").strip())
     return settings()
 
 
@@ -579,6 +594,42 @@ def _wecom_image(png: bytes) -> dict:
     }
 
 
+# --------------------------------------------------------------- 加签 / 鉴权
+def _dingtalk_url(url: str, secret: str) -> str:
+    """钉钉「加签」：把 timestamp 与 HMAC-SHA256 的 sign 拼进 URL。
+
+    签名算法来自官方文档：sign = urlencode(base64(HmacSHA256(f"{timestamp}\\n{secret}", secret)))。
+    secret 就是机器人安全设置里「加签」那一串（带 SEC 开头）。timestamp 必须是毫秒。
+    """
+    if not secret:
+        return url
+    timestamp = str(round(time.time() * 1000))
+    string_to_sign = f"{timestamp}\n{secret}"
+    digest = hmac.new(secret.encode("utf-8"), string_to_sign.encode("utf-8"),
+                      digestmod=hashlib.sha256).digest()
+    sign = urllib.parse.quote_plus(base64.b64encode(digest))
+    sep = "&" if ("?" in url) else "?"
+    return f"{url}{sep}timestamp={timestamp}&sign={sign}"
+
+
+def _feishu_sign(secret: str, timestamp: str) -> str:
+    """飞书自定义机器人「签名校验」：sign = base64(HmacSHA256(key=f"{timestamp}\\n{secret}", ""))。
+
+    注意这里 HMAC 的 key 是「timestamp\\nsecret」，待签内容是空串——和钉钉正好相反。
+    """
+    key = f"{timestamp}\n{secret}".encode("utf-8")
+    return base64.b64encode(hmac.new(key, b"", digestmod=hashlib.sha256).digest()).decode("utf-8")
+
+
+def _serverchan_url(url: str, key: str) -> str:
+    """Server 酱的 SendKey 就是鉴权本身。地址只填了 SendKey 时帮忙拼成完整 URL。"""
+    if key and "sctapi.ftqq.com" not in url and "{key}" not in url:
+        return f"https://sctapi.ftqq.com/{key}.send"
+    if "{key}" in url:
+        return url.replace("{key}", key or "")
+    return url
+
+
 def _merge(results: list[dict]) -> dict:
     """一条日报可能拆成文字 + 图片两个请求，成功与否要合起来看。"""
     if len(results) == 1:
@@ -592,10 +643,13 @@ def _merge(results: list[dict]) -> dict:
 def deliver(conf: dict, title: str, md: str, text: str, html_body: str,
             report: dict | None = None) -> dict:
     url = conf["url"]
+    kind = conf["kind"]
+    # Server 酱允许只填 SendKey；钉钉/飞书的加签靠 URL 参数，需在发请求前算好
+    if kind == "serverchan":
+        url = _serverchan_url(url, conf.get("webhook_key", ""))
     if not url.startswith(("http://", "https://")):
         return {"ok": False, "status": 0, "message": "Webhook 地址要以 http:// 或 https:// 开头"}
 
-    kind = conf["kind"]
     form = conf["form"]
     day = parse_day(report["day"]) if report else None
     png = card_png(day, fresh=True) if (day and form in ("both", "image")) else None
@@ -621,15 +675,22 @@ def deliver(conf: dict, title: str, md: str, text: str, html_body: str,
         body_md = md if (wants_text or not can_embed) else f"**{title}**"
         if can_embed:
             body_md += f"\n\n![观影日报]({img_url})"
-        return _post(url, {"msgtype": "markdown",
-                           "markdown": {"title": title, "text": _clip(body_md, 18000)}}, True)
+        return _post(_dingtalk_url(url, conf.get("sign_token", "")),
+                     {"msgtype": "markdown",
+                      "markdown": {"title": title, "text": _clip(body_md, 18000)}}, True)
 
     if kind == "feishu":
         body_text = text if (wants_text or not can_embed) else title
         if can_embed:
             body_text += f"\n\n图片：{img_url}"
-        return _post(url, {"msg_type": "text",
-                           "content": {"text": _clip(body_text, 18000)}}, True)
+        body = {"msg_type": "text", "content": {"text": _clip(body_text, 18000)}}
+        # 开了「签名校验」时，飞书要求 body 里带上 timestamp 和 sign
+        secret = conf.get("sign_token", "")
+        if secret:
+            ts = str(int(time.time()))
+            body["timestamp"] = ts
+            body["sign"] = _feishu_sign(secret, ts)
+        return _post(url, body, True)
 
     if kind == "serverchan":
         desp = md if (wants_text or not can_embed) else f"**{title}**"
