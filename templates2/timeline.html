@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster, csrf_field %}
+{% block title %}时间线 · 观影时间线{% endblock %}
+{% block heading %}时间线{% endblock %}
+{% block sub %}全部 {{ total }} 条记录 · {{ span }}{% endblock %}
+{% block tools %}
+<div class="seg" data-stagger>
+  {% for r in ranges %}<a class="{{ 'on' if r.on }}" href="{{ r.href }}">{{ r.label }}</a>{% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bento" data-stagger>
+  <div class="kpi"><div class="k">观看条目</div><div class="v grad" data-v="{{ kpis.events }}">{{ kpis.events }}</div><div class="k" style="margin-top:2px">条</div></div>
+  <div class="kpi"><div class="k">活跃天数</div><div class="v" data-v="{{ kpis.active_days }}">{{ kpis.active_days }}</div><div class="k" style="margin-top:2px">天</div></div>
+  <div class="kpi"><div class="k">在看剧集</div><div class="v" data-v="{{ kpis.shows }}">{{ kpis.shows }}</div><div class="k" style="margin-top:2px">部</div></div>
+  <div class="kpi"><div class="k">平均进度</div><div class="v" data-v="{{ kpis.avg_pct }}">{{ kpis.avg_pct }}<small>%</small></div></div>
+</div>
+
+<div class="card strip rise" style="--i:4">
+  <div class="t"><b>活跃度</b><span>近 90 天 · 每人每日观看集数</span>
+    <span class="lg">少<i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i>多</span>
+  </div>
+  <div data-stagger>
+  {% for row in strip.rows %}
+  <div class="row">
+    <a class="who" style="{{ '' if row.on else 'opacity:.35' }}" href="/user/{{ row.name|urlencode }}" title="{{ row.name }} · {{ row.total }} 集">{{ row.name }}</a>
+    <div class="cells">
+      {% for c in row.cells %}
+        {% set lv = 4 if c.n >= 5 else (3 if c.n >= 3 else (2 if c.n == 2 else (1 if c.n else 0))) %}
+        <div class="cell {{ 'l%d'|format(lv) if lv }}" title="{{ c.date }} · {{ c.n }} 集"></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+
+<div class="cols">
+  <div class="feed" data-stagger>
+    {% if not feed %}<div class="card"><div class="empty">这个范围里没有观看记录</div></div>{% endif %}
+    {% for d in feed %}
+    <div class="day">
+      <div class="dayhead">
+        <b>{{ d.label }}</b><i>{{ d.weekday }}</i>
+        <span class="pp">{{ d.people|join(' · ') }}</span>
+        <span class="n">{{ d.count }} 条</span>
+      </div>
+      {% for it in d.rows %}
+        {% if it.bulk %}
+        <div class="batch">
+          <span class="dot" style="background:{{ it.color }}"></span>
+          <span><b><a class="lnk" style="text-decoration:none" href="/user/{{ it.user|urlencode }}">{{ it.user }}</a></b> 批量标记 <b>{{ it.count }}</b> 集 · {{ it.shows|join('、') }}{% if it.more %} 等 {{ it.more }} 部{% endif %}</span>
+          <span style="margin-left:auto;font-family:var(--font-num)">{{ it.time }}</span>
+        </div>
+        {% else %}
+        <div class="erow">
+          <a href="/show/{{ it.key|urlencode }}" style="text-decoration:none">{{ poster(it.poster, it.hue, it.initial) }}</a>
+          <div class="ttl">
+            <b><a style="text-decoration:none;color:inherit" href="/show/{{ it.key|urlencode }}">{{ it.show }}</a></b>
+            {% if it.ep %}<span class="ep">{{ it.ep }}</span>{% endif %}
+            <span class="et">{{ it.title }}</span>
+            <span class="lb">{{ it.library }}</span>
+          </div>
+          <div class="u"><span class="d" style="background:{{ color_of(it.user) }}"></span><a style="text-decoration:none;color:inherit" href="/user/{{ it.user|urlencode }}">{{ it.user }}</a></div>
+          <div class="tm">{{ it.time }}</div>
+          {% if it.watched %}
+            <span class="chip">已看</span>
+          {% elif it.pct %}
+            <div class="pg"><div class="bar"><i data-w="{{ it.pct }}"></i></div><span class="p">{{ it.pct }}%</span></div>
+          {% else %}
+            <div class="pg"><span class="p na">—</span></div>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <aside class="rail" data-stagger>
+    {% if rail.tonight %}
+    <div class="card acc">
+      <div class="t"><b>✨ 今晚看什么</b><span>{{ rail.tonight|length }} 部</span></div>
+      {% for t in rail.tonight %}
+      <div class="now">
+        {{ poster(t.poster, t.hue, t.initial) }}
+        <div class="m"><b><a style="text-decoration:none;color:inherit" href="/show/{{ t.key|urlencode }}">{{ t.show }}</a></b>
+          <div class="s"><span class="rs">{{ t.reason }}</span><span>{{ t.user }}</span></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="t"><b>正在追</b><span>{{ rail.progress|length }} 部</span></div>
+      {% for p in rail.progress %}
+      <div class="now">
+        {{ poster(p.poster, p.hue, p.initial) }}
+        <div class="m"><b><a style="text-decoration:none;color:inherit" href="/show/{{ p.key|urlencode }}">{{ p.show }}</a></b>
+          <div class="s"><span>{{ p.ep }}</span><span>{{ p.user }}</span></div>
+          {% if p.pct %}<div class="bar"><i data-w="{{ p.pct }}"></i></div>{% else %}<span class="p na">—</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if not rail.progress %}<div class="note">最近没有未看完的剧</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="t"><b>多人共看</b><span>≥2 人</span></div>
+      {% for d in rail.duo %}
+      <div class="duo">
+        <div class="avat">{% for u in d.users[:4] %}<i style="color:{{ color_of(u) }}">{{ initial(u) }}</i>{% endfor %}</div>
+        <a style="text-decoration:none;color:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" href="/show/{{ d.key|urlencode }}">{{ d.show }}</a>
+        <span class="n">{{ d.n }} 人</span>
+      </div>
+      {% endfor %}
+      {% if not rail.duo %}<div class="note">暂无</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="t"><b>被排除的内容</b></div>
+      <div class="note">
+        已排除 <b style="color:var(--text)">{{ rail.excluded.count }}</b> 条记录
+        {% if rail.excluded.libs %}<br>媒体库：{{ rail.excluded.libs|join('、') }}{% endif %}
+        {% if rail.excluded.users %}<br>账号：{{ rail.excluded.users|join('、') }}{% endif %}
+        {% if not rail.excluded.libs and not rail.excluded.users %}<br>当前没有排除项{% endif %}
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

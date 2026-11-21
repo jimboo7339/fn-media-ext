@@ -7,7 +7,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -90,7 +90,19 @@ quiet.install()  # 吞掉「非 HTTP 请求」的重复告警；是否再打周�
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), name="static")
 tpl = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
-tpl.env.globals.update(color_of=queries.color_of, initial=queries.initial, hue_of=queries.hue_of)
+tpl2 = Jinja2Templates(directory=str(config.BASE_DIR / "templates2"))
+for _env in (tpl.env, tpl2.env):
+    _env.globals.update(color_of=queries.color_of, initial=queries.initial, hue_of=queries.hue_of)
+
+
+def _engine(request: Request) -> Jinja2Templates:
+    """UI 版本选择：cookie fnxt.ui=2 走 2.0，缺省永远是经典版（1.0 一行未改）。"""
+    return tpl2 if request.cookies.get("fnxt.ui") == "2" else tpl
+
+
+def render(request: Request, name: str, ctx: dict, **kwargs):
+    """按当前 UI 版本挑模板引擎渲染；两个版本共用同一份数据上下文。"""
+    return _engine(request).TemplateResponse(request, name, ctx, **kwargs)
 
 
 def _fmt_time(ms: int | None) -> str:
@@ -117,6 +129,22 @@ async def csrf_check(request: Request) -> None:
     expected = auth.csrf_token(sid)
     if not sid or not supplied or not _hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=403, detail="csrf token missing or invalid")
+
+
+@app.middleware("http")
+async def ui_switch(request: Request, call_next):
+    """?ui=2 / ?ui=1 随时切换 UI 版本：写一年期 cookie，再把参数从地址里拿掉。
+
+    注册在两个中间件之后 = 最先执行，登录页上也能切。"""
+    if request.method == "GET" and request.query_params.get("ui") in ("1", "2"):
+        params = dict(request.query_params)
+        ui = params.pop("ui")
+        rest = urlencode(params)
+        target = request.url.path + (f"?{rest}" if rest else "")
+        resp = RedirectResponse(target, 303)
+        resp.set_cookie("fnxt.ui", ui, max_age=365 * 86_400, samesite="lax")
+        return resp
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -189,7 +217,7 @@ def _days(raw: str) -> int:
 def timeline(request: Request, days: str = "30", u: str = "", l: str = ""):
     state = queries.filter_state(_days(days), u, l)
     ctx = queries.timeline_context(state, "/")
-    return tpl.TemplateResponse(
+    return render(
         request, "timeline.html", shell(request, "timeline", nav_q=queries.nav_qs(state), **ctx)
     )
 
@@ -198,14 +226,14 @@ def timeline(request: Request, days: str = "30", u: str = "", l: str = ""):
 def matrix(request: Request, days: str = "30", u: str = "", l: str = ""):
     state = queries.filter_state(_days(days), u, l)
     ctx = queries.matrix_context(state)
-    return tpl.TemplateResponse(
+    return render(
         request, "matrix.html", shell(request, "matrix", nav_q=queries.nav_qs(state), **ctx)
     )
 
 
 @app.get("/live")
 def live_page(request: Request):
-    return tpl.TemplateResponse(
+    return render(
         request, "live.html", shell(request, "live", live=live.snapshot())
     )
 
@@ -213,7 +241,7 @@ def live_page(request: Request):
 @app.get("/partials/live")
 def live_partial(request: Request):
     """HTML fragment polled by the live page; same view model as the full page."""
-    return tpl.TemplateResponse(
+    return render(
         request, "_live.html", shell(request, "live", live=live.snapshot())
     )
 
@@ -221,7 +249,7 @@ def live_partial(request: Request):
 # -------------------------------------------------------------- detail pages
 def _missing(request: Request, what: str) -> Response:
     """详情页 404 渲染成带导航的页面：从时间线点进来的人不应该被留在死胡同里。"""
-    return tpl.TemplateResponse(
+    return render(
         request, "missing.html", {"request": request, "what": what}, status_code=404
     )
 
@@ -231,7 +259,7 @@ def show_page(request: Request, key: str):
     ctx = queries.show_context(key)
     if ctx is None:
         return _missing(request, "这部影片")
-    return tpl.TemplateResponse(request, "show.html", shell(request, "show", **ctx))
+    return render(request, "show.html", shell(request, "show", **ctx))
 
 
 @app.get("/user/{name}")
@@ -241,33 +269,33 @@ def user_page(request: Request, name: str):
         return _missing(request, "这个账号")
     # 侧栏列表在这里既是导航也是"你在看谁"的指示，所以详情页也要带上
     ctx.update(queries.default_filters("/"))
-    return tpl.TemplateResponse(request, "user.html", shell(request, "user", **ctx))
+    return render(request, "user.html", shell(request, "user", **ctx))
 
 
 # ------------------------------------------------------------------ analysis
 @app.get("/search")
 def search_page(request: Request, q: str = ""):
     ctx = queries.search_context(q)
-    return tpl.TemplateResponse(request, "search.html", shell(request, "search", **ctx))
+    return render(request, "search.html", shell(request, "search", **ctx))
 
 
 @app.get("/recap")
 def recap_page(request: Request, mode: str = "month", p: str = ""):
     ctx = queries.recap_context(mode, p)
-    return tpl.TemplateResponse(request, "recap.html", shell(request, "recap", **ctx))
+    return render(request, "recap.html", shell(request, "recap", **ctx))
 
 
 @app.get("/dropouts")
 def dropouts_page(request: Request, d: str = "30"):
     days = int(d) if d in ("7", "30", "90", "180") else 30
     ctx = queries.dropout_context(days)
-    return tpl.TemplateResponse(request, "dropouts.html", shell(request, "dropouts", **ctx))
+    return render(request, "dropouts.html", shell(request, "dropouts", **ctx))
 
 
 @app.get("/stats")
 def stats_page(request: Request):
     ctx = queries.stats_context()
-    return tpl.TemplateResponse(request, "stats.html", shell(request, "stats", **ctx))
+    return render(request, "stats.html", shell(request, "stats", **ctx))
 
 
 # ------------------------------------------------------------------- digest
@@ -286,7 +314,7 @@ def digest_page(request: Request, day: str = "", sent: str = "", note: str = "",
     today = datetime.now(config.TZ).date()
     target = digest.parse_day(day) or digest.default_day()
     report = digest.build(target)
-    return tpl.TemplateResponse(
+    return render(
         request,
         "digest.html",
         shell(
@@ -398,7 +426,7 @@ def card_image(request: Request, day: str, sig: str = ""):
 def libraries_page(request: Request):
     ctx = queries.library_context()
     ctx.update(meta.scan())   # 刮削完整度盘点（源库没变就复用上次结论）
-    return tpl.TemplateResponse(request, "libraries.html", shell(request, "libraries", **ctx))
+    return render(request, "libraries.html", shell(request, "libraries", **ctx))
 
 
 @app.get("/settings")
@@ -409,7 +437,7 @@ def settings(request: Request, done: int = 0, sync: str = "", pw: str = ""):
     events = queries.load_events()
     shows = {e["show_key"]: e["poster"] for e in events}
     poster_stats = posters.stats([{"show_key": k, "poster": v} for k, v in shows.items()])
-    return tpl.TemplateResponse(
+    return render(
         request,
         "settings.html",
         shell(
@@ -441,16 +469,14 @@ def settings(request: Request, done: int = 0, sync: str = "", pw: str = ""):
 # --------------------------------------------------------------------- auth
 @app.get("/login")
 def login_page(request: Request, next: str = "/", err: int = 0, pw: int = 0):
-    return tpl.TemplateResponse(
-        request, "login.html", {"request": request, "next": next, "err": err, "pw": pw}
-    )
+    return render(request, "login.html", {"request": request, "next": next, "err": err, "pw": pw})
 
 
 @app.post("/login")
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/")):
     account = auth.check_login(username, password)
     if not account:
-        return tpl.TemplateResponse(
+        return render(
             request,
             "login.html",
             {"request": request, "next": next, "err": 1, "pw": 0},
@@ -466,13 +492,13 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 
 @app.get("/setup")
 def setup_page(request: Request):
-    return tpl.TemplateResponse(request, "setup.html", {"request": request, "err": 0})
+    return render(request, "setup.html", {"request": request, "err": 0})
 
 
 @app.post("/setup")
 def setup_submit(request: Request, username: str = Form(...), password: str = Form(...)):
     if auth.account_count() or len(password) < 6 or not auth.create_account(username, password):
-        return tpl.TemplateResponse(request, "setup.html", {"request": request, "err": 1}, status_code=400)
+        return render(request, "setup.html", {"request": request, "err": 1}, status_code=400)
     account = auth.check_login(username, password)
     token = auth.new_session(account["id"])
     resp = RedirectResponse("/", 303)

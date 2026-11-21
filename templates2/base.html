@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>{% block title %}观影时间线 · UI 2.0{% endblock %}</title>
+{% from "_macros.html" import themeboot %}
+{{ themeboot() }}
+<link rel="stylesheet" href="/static/ui2.css?v={{ version }}">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+</head>
+<body>
+<a class="skip" href="#main">跳到主内容</a>
+
+<header class="topnav">
+  <a class="brand" href="/{{ nav_q }}">
+    <span class="logo">{% from "_macros.html" import mark %}{{ mark() }}</span>观影时间线
+  </a>
+
+  <nav class="u2nav" aria-label="主导航">
+    <a href="/{{ nav_q }}" class="{{ 'on' if page == 'timeline' }}" aria-current="{{ 'page' if page == 'timeline' else 'false' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>时间线</a>
+    <a href="/live" class="{{ 'on' if page == 'live' }}" aria-current="{{ 'page' if page == 'live' else 'false' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5a7.8 7.8 0 0 0 0 11M17.5 17.5a7.8 7.8 0 0 0 0-11"/></svg>实时</a>
+    <a href="/matrix{{ nav_q }}" class="{{ 'on' if page == 'matrix' }}" aria-current="{{ 'page' if page == 'matrix' else 'false' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>矩阵</a>
+    <a href="/stats" class="{{ 'on' if page == 'stats' }}" aria-current="{{ 'page' if page == 'stats' else 'false' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>排行</a>
+  </nav>
+
+  <details class="drop">
+    <summary aria-label="分析页面菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M4 6h16M4 12h16M4 18h10"/></svg>分析
+    </summary>
+    <div class="menu">
+      <a href="/recap">月度回顾</a>
+      <a href="/dropouts">弃剧分析</a>
+      <a href="/digest">每日日报</a>
+      <a href="/libraries">媒体库体检</a>
+    </div>
+  </details>
+
+  <span class="spacer" style="flex:1"></span>
+
+  <form class="searchbox" method="get" action="/search" role="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+    <input type="search" name="q" id="q2" value="{{ q if q is defined else '' }}" placeholder="搜索剧集 / 成员（按 /）" autocomplete="off" aria-label="搜索">
+  </form>
+
+  {% from "_macros.html" import themes %}
+  {{ themes() }}
+</header>
+
+<main class="shell" id="main" tabindex="-1">
+  <div class="pagehead">
+    <div style="min-width:0">
+      <h1>{% block heading %}{% endblock %}</h1>
+      <div class="sub">{% block sub %}{% endblock %}</div>
+    </div>
+    <div class="tools">{% block tools %}{% endblock %}</div>
+  </div>
+
+  {% if sync_error %}<div class="banner bad"><b>同步失败：</b><span>{{ sync_error }}</span></div>{% endif %}
+  {% block content %}{% endblock %}
+
+  <div class="u2foot">
+    <span>只读挂载 · 不修改飞牛影视数据库</span>
+    <span>数据更新至 {{ synced }}</span>
+    <span>v{{ version }} · UI 2.0 · <a href="/?ui=1">回到经典版</a></span>
+    <span class="sp"></span>
+    {% if account %}<span>{{ account.username }} · <a href="#" onclick="document.getElementById('logout2').submit();return false">退出</a></span>{% endif %}
+  </div>
+  <form id="logout2" method="post" action="/logout" style="display:none">
+    {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
+  </form>
+</main>
+
+<nav class="tabs" aria-label="移动端导航">
+  <a href="/{{ nav_q }}" class="{{ 'on' if page == 'timeline' }}" aria-current="{{ 'page' if page == 'timeline' else 'false' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>时间线</a>
+  <a href="/live" class="{{ 'on' if page == 'live' }}" aria-current="{{ 'page' if page == 'live' else 'false' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5a7.8 7.8 0 0 0 0 11M17.5 17.5a7.8 7.8 0 0 0 0-11"/></svg>实时</a>
+  <a href="/matrix{{ nav_q }}" class="{{ 'on' if page == 'matrix' }}" aria-current="{{ 'page' if page == 'matrix' else 'false' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>矩阵</a>
+  <a href="/stats" class="{{ 'on' if page == 'stats' }}" aria-current="{{ 'page' if page == 'stats' else 'false' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>排行</a>
+  <details class="drop">
+    <summary aria-label="更多页面">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>更多
+    </summary>
+    <div class="menu" style="position:fixed;bottom:70px;right:12px;left:auto">
+      <a href="/recap">月度回顾</a>
+      <a href="/dropouts">弃剧分析</a>
+      <a href="/digest">每日日报</a>
+      <a href="/libraries">媒体库体检</a>
+      <a href="/settings">设置</a>
+      <a href="/?ui=1">回到经典版</a>
+    </div>
+  </details>
+</nav>
+
+<script src="/static/ui2.js?v={{ version }}"></script>
+</body>
+</html>

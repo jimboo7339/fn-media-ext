@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}搜索 · 观影时间线{% endblock %}
+{% block heading %}搜索{% endblock %}
+{% block sub %}{% if q %}「{{ q }}」的结果{% else %}共 {{ total_events }} 条记录 · {{ total_shows }} 部剧集{% endif %}{% endblock %}
+
+{% block content %}
+{% if not q %}
+  <div class="card rise">
+    <div class="t"><b>常看的剧</b><span>按记录数</span></div>
+    <div class="chips">
+      {% for s in hot %}
+      <a class="chipbtn" href="/show/{{ s.key|urlencode }}">{{ s.show }}<span class="c">{{ s.events }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card rise" style="margin-top:14px;--i:1">
+    <div class="t"><b>成员</b><span>{{ members|length }} 人</span></div>
+    <div class="chips">
+      {% for u in members %}
+      <a class="chipbtn" href="/user/{{ u.name|urlencode }}">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{{ u.color }}"></span>{{ u.name }}<span class="c">{{ u.events }} 条</span></a>
+      {% endfor %}
+    </div>
+    <div class="note" style="margin-top:12px">搜索支持剧名、单集标题、季集编号（如 S01E14）和成员名。按 <b style="color:var(--text)">/</b> 可以随时跳到这个搜索框。</div>
+  </div>
+
+{% else %}
+  {% if not shows and not users and not events %}
+  <div class="card rise"><div class="empty">没有找到「{{ q }}」</div></div>
+  {% endif %}
+
+  {% if shows %}
+  <div class="card rise">
+    <div class="t"><b>剧集</b><span>{{ shows|length }} 部</span></div>
+    <div style="display:grid;gap:0 26px;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))" data-stagger>
+      {% for s in shows %}
+      <a class="now" href="/show/{{ s.key|urlencode }}" style="text-decoration:none;color:inherit">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <div class="m">
+          <b>{{ s.show }}</b>
+          <div class="s"><span>{{ s.library }} · {{ s.events }} 条 · {{ s.people }} 人</span></div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if users %}
+  <div class="card rise" style="margin-top:14px;--i:1">
+    <div class="t"><b>成员</b><span>{{ users|length }} 人</span></div>
+    <div class="chips">
+      {% for u in users %}
+      <a class="chipbtn" href="/user/{{ u.name|urlencode }}">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{{ u.color }}"></span>{{ u.name }}<span class="c">{{ u.events }} 条 · {{ u.minutes // 60 }} 小时</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if events %}
+  <div class="card rise" style="margin-top:14px;--i:2">
+    <div class="t"><b>观看记录</b><span>{{ event_total }} 条{% if event_total > events|length %} · 显示前 {{ events|length }} 条{% endif %}</span></div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>时间</th><th>内容</th><th>用户</th><th>进度</th></tr></thead>
+        <tbody>
+        {% for r in events %}
+        <tr>
+          <td data-label="时间" class="num">{{ r.time }}</td>
+          <td data-label="内容">
+            <a style="text-decoration:none;color:var(--head);font-weight:600" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>
+            {% if r.ep %}<span style="color:var(--accent);font-size:11px;font-family:var(--font-num);margin-left:6px">{{ r.ep }}</span>{% endif %}
+            {% if r.title %}<span style="color:var(--dim);font-size:11.5px;margin-left:8px">{{ r.title }}</span>{% endif %}
+          </td>
+          <td data-label="用户"><span class="who"><span class="d" style="background:{{ r.color }}"></span>
+            <a style="text-decoration:none;color:inherit" href="/user/{{ r.user|urlencode }}">{{ r.user }}</a></span></td>
+          <td data-label="进度">
+            {% if r.watched %}<span class="chip">已看</span>
+            {% elif r.pct %}<div class="pg"><div class="bar" style="flex:1;min-width:0"><i data-w="{{ r.pct }}"></i></div><span class="p">{{ r.pct }}%</span></div>
+            {% else %}<div class="pg"><span class="p na">—</span></div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

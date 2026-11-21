@@ -1013,7 +1013,8 @@ def recap_context(mode: str, period: str) -> dict:
     months = sorted({(day_of(e["event_time"]).year, day_of(e["event_time"]).month) for e in evs})
     years = sorted({y for y, _ in months})
     if not months:
-        return {"mode": mode, "empty": True}
+        # 空库也要给出模板 tools/title 用到的键，否则全新安装第一次打开 /recap 直接 500
+        return {"mode": mode, "empty": True, "label": "", "period": ""}
 
     if mode == "year":
         keys = [str(y) for y in years]

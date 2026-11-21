@@ -13,27 +13,15 @@ from __future__ import annotations
 import os
 import re
 import sys
-import tempfile
-from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 配置是模块级常量：必须在触碰任何 app.* 之前把路径指到本测试专用的临时目录。
-# （pytest 会先收集其它测试模块，config 可能已被 import，所以这里显式重指。）
-_tmp = Path(tempfile.mkdtemp(prefix="fnxt-csrf-"))
 os.environ.pop("PREVIEW_AUTOLOGIN", None)
-
-from app import config, db  # noqa: E402
-
-config.DATA_DIR = _tmp
-config.APP_DB = _tmp / "app.db"
-config.SNAP_DIR = _tmp / "snap"
-config.DB_DIR = _tmp / "no-such-db"
-config.IMG_ROOT = _tmp / "img"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import main  # noqa: E402
+from app import db, main  # noqa: E402
+from tests._freshdb import fresh_db  # noqa: E402
 
 _STATE: dict = {}
 
@@ -41,7 +29,7 @@ _STATE: dict = {}
 def _shared_client() -> TestClient:
     """整个文件共用一个已完成初始化 + 登录的客户端（含 lifespan 之外的初始化）。"""
     if "client" not in _STATE:
-        db.init()
+        fresh_db("fnxt-csrf-")  # 运行时重指，隔离其它测试文件的 config 改动
         c = TestClient(main.app, follow_redirects=False)
         r = c.post("/setup", data={"username": "admin", "password": "secret6"})
         assert r.status_code == 303, "初始化管理员失败"

@@ -96,6 +96,17 @@ CREATE TABLE IF NOT EXISTS sync_state (
     error       TEXT
 );
 
+-- 播放心跳（UI/统计）：从源库 user_activity_log 永久抄录的真实播放信号。
+-- 建在主 SCHEMA 里而不是 capture 时才建：同步失败（如快照挂载异常）时
+-- /stats 也会来查这张表，不能让页面 500。
+CREATE TABLE IF NOT EXISTS play_heartbeat (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_name   TEXT NOT NULL,
+    hb_time     INTEGER NOT NULL,      -- ms UTC（源库 create_time 秒 ×1000）
+    captured_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_hb_user_time ON play_heartbeat(user_name, hb_time);
+
 -- 日报的投递记录：只留最近若干条，够页面显示「最近发送」就行
 CREATE TABLE IF NOT EXISTS digest_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

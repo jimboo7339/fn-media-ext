@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+{% block title %}{{ name }} · 观影时间线{% endblock %}
+{% block heading %}<span style="display:inline-grid;place-items:center;width:40px;height:40px;border-radius:13px;background:{{ color }};color:#fff;font-size:17px;font-weight:750;vertical-align:-10px;margin-right:10px;box-shadow:var(--sh-1)">{{ mark }}</span>{{ name }}{% endblock %}
+{% block sub %}第一次观看 {{ first }} · 最近 {{ last }}{% endblock %}
+{% block tools %}
+<a class="btn" href="/?u={{ name|urlencode }}">只看 {{ name }} 的时间线</a>
+<a class="btn" href="/">时间线</a>
+{% endblock %}
+
+{% block content %}
+<div class="bento" data-stagger>
+  <div class="kpi"><div class="k">观看记录</div><div class="v grad" data-v="{{ kpis.events }}">{{ kpis.events }}</div><div class="k" style="margin-top:2px">条</div></div>
+  <div class="kpi"><div class="k">活跃天数</div><div class="v" data-v="{{ kpis.days }}">{{ kpis.days }}</div><div class="k" style="margin-top:2px">天</div></div>
+  <div class="kpi"><div class="k">在追剧集</div><div class="v" data-v="{{ kpis.following }}">{{ kpis.following }}</div><div class="k" style="margin-top:2px">部</div></div>
+  <div class="kpi"><div class="k">观看时长</div><div class="v" style="font-size:clamp(19px,2vw,23px);letter-spacing:-.2px">{{ kpis.minutes_label }}</div></div>
+</div>
+
+<div class="cols" style="margin-top:12px" data-stagger>
+  <div class="feed" style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="t"><b>媒体库分布</b><span>共 {{ kpis.events }} 条</span></div>
+      {% for b in libs %}
+      <div class="rk" style="grid-template-columns:110px 1fr 96px">
+        <span class="nm">{{ b.name }}</span>
+        <div class="bar"><i data-w="{{ b.pct }}"></i></div>
+        <span class="v">{{ b.n }} · {{ b.pct }}%</span>
+      </div>
+      {% endfor %}
+      {% if not libs %}<div class="note">没有记录</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="t"><b>观看习惯</b></div>
+      <div class="kv">
+        <span>连续观看</span><b>最长 {{ streak }} 天{% if streak_now %} · 当前 {{ streak_now }} 天{% endif %}</b>
+        <span>高峰时段</span><b>{{ peak_hour }}</b>
+        <span>观看时长</span><b>约 {{ kpis.minutes // 60 }} 小时</b>
+        <span>整部看完</span><b>{{ finished|length }} 部</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed" style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="t"><b>观看时段</b><span>峰值 {{ peak_hour }}</span></div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:120px" data-stagger>
+        {% for h in hours %}{% if h.n %}<i style="flex:1;height:{{ h.pct }}%;min-height:3px;background:var(--grad);opacity:.92;border-radius:4px 4px 2px 2px" title="{{ h.label }} 时 · {{ h.n }} 条"></i>{% else %}<i style="flex:1;height:2px;background:var(--panel-2);border-radius:2px" title="{{ h.label }} 时 · 0 条"></i>{% endif %}{% endfor %}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:10px;color:var(--faint);font-family:var(--font-num)"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+      <div style="height:16px"></div>
+      {% for w in weekdays %}
+      <div class="rk" style="grid-template-columns:52px 1fr 44px">
+        <span class="nm">{{ w.name }}</span>
+        <div class="bar"><i data-w="{{ w.pct }}"></i></div>
+        <span class="v">{{ w.n }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="cols" style="margin-top:12px" data-stagger>
+  <div class="feed" style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="t"><b>在追</b><span>{{ kpis.following }} 部{% if following|length < kpis.following %} · 显示最近 {{ following|length }} 部{% endif %}</span></div>
+      {% for s in following %}
+      <a class="now" href="/show/{{ s.key|urlencode }}" style="text-decoration:none;color:inherit">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <div class="m">
+          <b>{{ s.show }}</b>
+          <div class="s"><span>{{ s.ep }}{% if s.title %} {{ s.title }}{% endif %}</span><span>{{ s.time }}</span></div>
+          <div class="bar"><i data-w="{{ s.pct }}"></i></div>
+        </div>
+      </a>
+      {% endfor %}
+      {% if not following %}<div class="note">没有未看完的剧</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="t"><b>最近观看</b><span>{{ recent|length }} 条</span></div>
+      <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>时间</th><th>内容</th><th>进度</th></tr></thead>
+        <tbody>
+        {% for r in recent %}
+        <tr>
+          <td data-label="时间" class="num">{{ r.time }}</td>
+          <td data-label="内容">
+            <a class="lnk" style="text-decoration:none;color:var(--head)" href="/show/{{ r.key|urlencode }}">{{ r.show }}</a>
+            {% if r.ep %}<span class="ep" style="color:var(--accent);font-size:11.5px;font-weight:650;font-family:var(--font-num);margin-left:6px">{{ r.ep }}</span>{% endif %}
+            {% if r.title %}<span style="color:var(--dim);font-size:12px;margin-left:6px">{{ r.title }}</span>{% endif %}
+          </td>
+          <td data-label="进度">
+            {% if r.watched %}<span class="chip">已看</span>
+            {% elif r.pct %}<div class="pg"><div class="bar"><i data-w="{{ r.pct }}"></i></div><span class="p">{{ r.pct }}%</span></div>
+            {% else %}<div class="pg"><span class="p na">—</span></div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% if not recent %}<div class="empty">没有记录</div>{% endif %}
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="card">
+      <div class="t"><b>看完的剧</b><span>{{ finished|length }} 部</span></div>
+      {% for s in finished %}
+      <div class="now">
+        {{ poster(s.poster, s.hue, s.initial) }}
+        <div class="m">
+          <b><a style="text-decoration:none;color:inherit" href="/show/{{ s.key|urlencode }}">{{ s.show }}</a></b>
+          <div class="s"><span>{{ s.done_eps }} 集</span><span>{{ s.time }}</span></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not finished %}<div class="note">还没有整部看完的剧</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="t"><b>和谁看得最像</b><span>共同剧集</span></div>
+      {% for c in coop %}
+      <div class="duo">
+        <div class="avat"><i style="color:{{ c.color }}">{{ c.initial }}</i></div>
+        <a style="text-decoration:none;color:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" href="/user/{{ c.name|urlencode }}">{{ c.name }}</a>
+        <span class="n">{{ c.n }} 部</span>
+      </div>
+      {% endfor %}
+      {% if not coop %}<div class="note">没有重叠的观看记录</div>{% endif %}
+    </div>
+  </aside>
+</div>
+
+<div class="note" style="margin:16px 2px 0">
+  观看时长是估算：按每集看到的最远位置计算，同集去重、扣掉应用自动跳过的片头片尾，
+  再用「这一集首次打开到下一次播放」的间隔封顶。飞牛不记录播放速度，所以倍速和拖动
+  只能收窄、无法还原；数字是「内容时长」的上界，不是实际播放耗时。
+  「在追」指最近一次记录尚未标记看完的剧。
+</div>
+{% endblock %}

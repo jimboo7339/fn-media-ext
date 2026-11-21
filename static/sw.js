@@ -5,10 +5,12 @@
  * 页面与接口永远走网络：这个应用的全部价值在于数据新鲜度，不做离线页面。
  * 改缓存策略时同步升级 CACHE 版本号。
  */
-var CACHE = "fnxt-static-v1";
+var CACHE = "fnxt-static-v2";
 var ASSETS = [
   "/static/app.css",
   "/static/app.js",
+  "/static/ui2.css",
+  "/static/ui2.js",
   "/static/favicon.svg",
   "/static/icon-192.png",
   "/static/icon-512.png"
