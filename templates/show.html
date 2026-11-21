@@ -3,7 +3,7 @@
 {% block title %}{{ head.title }} · 观影时间线{% endblock %}
 {% block heading %}{{ head.title }}{% endblock %}
 {% block sub %}{{ head.kind }} · {{ head.library }}{% if head.genres %} · {{ head.genres }}{% endif %} · {{ kpis.people }} 人看过{% endblock %}
-{% block tools %}<a class="btn" href="/matrix">剧集矩阵</a>{% endblock %}
+{% block tools %}<a class="btn" href="/" onclick="history.back();return false">返回</a><a class="btn" href="/matrix">剧集矩阵</a>{% endblock %}
 
 {% block content %}
 <div class="kpis">

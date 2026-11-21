@@ -21,10 +21,10 @@
     {% if err %}<div class="err">用户名或密码不正确</div>{% endif %}
     {% if pw %}<div class="ok">密码已更新，请重新登录</div>{% endif %}
     <input type="hidden" name="next" value="{{ next }}">
-    <label>用户名</label>
-    <input type="text" name="username" autofocus autocomplete="username">
-    <label>密码</label>
-    <input type="password" name="password" autocomplete="current-password">
+    <label for="f-username">用户名</label>
+    <input id="f-username" type="text" name="username" autofocus autocomplete="username">
+    <label for="f-password">密码</label>
+    <input id="f-password" type="password" name="password" autocomplete="current-password">
     <button class="btn primary" type="submit">登录</button>
   </form>
 </div>

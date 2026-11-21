@@ -19,10 +19,10 @@
     <h1>初始化管理员</h1>
     <p>第一次启动，请创建唯一的登录账号。</p>
     {% if err %}<div class="err">创建失败：用户名不能为空，密码至少 6 位</div>{% endif %}
-    <label>用户名</label>
-    <input type="text" name="username" value="admin" autofocus autocomplete="username">
-    <label>密码</label>
-    <input type="password" name="password" autocomplete="new-password">
+    <label for="f-username">用户名</label>
+    <input id="f-username" type="text" name="username" value="admin" autofocus autocomplete="username">
+    <label for="f-password">密码</label>
+    <input id="f-password" type="password" name="password" autocomplete="new-password">
     <button class="btn primary" type="submit">创建并登录</button>
   </form>
 </div>

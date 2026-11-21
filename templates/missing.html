@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>没有找到 · 观影时间线</title>
+{% from "_macros.html" import themeboot, mark %}
+{{ themeboot() }}
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<div class="login">
+  <div class="box" style="text-align:center">
+    <div class="logo" style="margin:0 auto 16px">{{ mark() }}</div>
+    <h1>没有{{ what }}的观看记录</h1>
+    <p>它可能已被排除，或者还没有人看过。</p>
+    <div class="form" style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+      <a class="btn primary" href="/">返回时间线</a>
+      <a class="btn" href="/search">去搜索</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

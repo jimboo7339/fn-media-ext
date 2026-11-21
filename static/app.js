@@ -51,6 +51,7 @@
   if (live) {
     var paused = false;
     var timer = null;
+    var inflight = false;
     var btn = document.getElementById("live-pause");
     var dot = document.getElementById("live-dot");
     var label = document.getElementById("live-mode");
@@ -63,15 +64,22 @@
       if (label) label.textContent = n ? n + " 路正在观看" : "当前无人观看";
     };
     var tick = function () {
-      if (paused || document.hidden) return;
+      if (paused || document.hidden || inflight) return;
+      inflight = true;
       fetch("/partials/live", { headers: { Accept: "text/html" }, credentials: "same-origin" })
         .then(function (r) {
-          return r.ok ? r.text() : null;
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
         })
         .then(function (html) {
           if (html) apply(html);
         })
-        .catch(function () {});
+        .catch(function () {
+          // 失败不能静默：保留上一次的内容，把状态说出来
+          if (dot) dot.classList.add("idle");
+          if (label) label.textContent = "刷新失败，稍后重试";
+        })
+        .then(function () { inflight = false; });
     };
     var start = function () {
       if (!timer) timer = setInterval(tick, 10000);
@@ -119,13 +127,27 @@
   var menuBtn = document.getElementById("menu-btn");
   var closeBtn = document.getElementById("drawer-close");
   var moreBtn = document.getElementById("more-btn");
+  var drawerReturnFocus = null;
 
+  function drawerOpen() {
+    return side.classList.contains("open");
+  }
   function setDrawer(open) {
     if (!side) return;
     side.classList.toggle("open", open);
     if (scrim) scrim.classList.toggle("on", open);
     if (menuBtn) menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    side.setAttribute("aria-modal", open ? "true" : "false");
     document.documentElement.style.overflow = open ? "hidden" : "";
+    if (open) {
+      // 抽屉是临时模态：记住出发点，把焦点移进抽屉，Tab 循环限制在其中
+      drawerReturnFocus = document.activeElement;
+      var target = closeBtn || side.querySelector("a[href], button");
+      if (target) target.focus();
+    } else if (drawerReturnFocus && drawerReturnFocus.focus) {
+      drawerReturnFocus.focus();
+      drawerReturnFocus = null;
+    }
   }
   if (side) {
     each([menuBtn, closeBtn, moreBtn], function (b) {
@@ -133,7 +155,23 @@
     });
     if (scrim) scrim.addEventListener("click", function () { setDrawer(false); });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") setDrawer(false);
+      if (!drawerOpen()) return;
+      if (e.key === "Escape") {
+        setDrawer(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      var focusables = side.querySelectorAll("a[href], button:not([disabled]), input, select");
+      if (!focusables.length) return;
+      var first = focusables[0];
+      var last = focusables[focusables.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !side.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !side.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
     });
     // 点抽屉里的链接后自动收起
     each(side.querySelectorAll("a"), function (a) {

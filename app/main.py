@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -54,6 +55,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="观影时间线", lifespan=lifespan, docs_url=None, redoc_url=None)
 quiet.install()  # 吞掉「非 HTTP 请求」的重复告警；是否再打周期汇总由 QUIET_SUMMARY 决定
+# JSON / HTML 响应体普遍只有几 KB，但它对 /static 的 43KB CSS 和模板页都有收益
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), name="static")
 tpl = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
 tpl.env.globals.update(color_of=queries.color_of, initial=queries.initial, hue_of=queries.hue_of)
@@ -184,15 +187,18 @@ def live_partial(request: Request):
 
 
 # -------------------------------------------------------------- detail pages
-def _missing(what: str) -> Response:
-    return Response(f"没有{what}的观看记录", status_code=404, media_type="text/plain; charset=utf-8")
+def _missing(request: Request, what: str) -> Response:
+    """详情页 404 渲染成带导航的页面：从时间线点进来的人不应该被留在死胡同里。"""
+    return tpl.TemplateResponse(
+        request, "missing.html", {"request": request, "what": what}, status_code=404
+    )
 
 
 @app.get("/show/{key}")
 def show_page(request: Request, key: str):
     ctx = queries.show_context(key)
     if ctx is None:
-        return _missing("这部影片")
+        return _missing(request, "这部影片")
     return tpl.TemplateResponse(request, "show.html", shell(request, "show", **ctx))
 
 
@@ -200,7 +206,7 @@ def show_page(request: Request, key: str):
 def user_page(request: Request, name: str):
     ctx = queries.user_context(name)
     if ctx is None:
-        return _missing("这个账号")
+        return _missing(request, "这个账号")
     # 侧栏列表在这里既是导航也是"你在看谁"的指示，所以详情页也要带上
     ctx.update(queries.default_filters("/"))
     return tpl.TemplateResponse(request, "user.html", shell(request, "user", **ctx))
