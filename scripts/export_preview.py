@@ -3,9 +3,9 @@
 
 Not the final ingest pipeline -- just enough to render a realistic mockup.
 """
+import datetime
 import json
 import sqlite3
-import datetime
 from collections import Counter, defaultdict
 
 TZ = datetime.timezone(datetime.timedelta(hours=8))
@@ -63,8 +63,6 @@ def main():
         if status == 0 or "_deleted_" in (n or ""):
             continue
         users[g] = n
-    libs = {g: t for g, t in con.execute(
-        "SELECT item_guid, (SELECT title FROM item WHERE guid=item_guid) FROM mediadb_config")}
 
     rows = con.execute("""
         SELECT p.user_guid, p.item_guid, p.ts, p.watched, p.create_time, p.update_time,
@@ -94,7 +92,7 @@ def main():
 
     events = []
     for (ug, ig, ts, watched, ct, ut, itype, ititle, itrim, sn, en, runtime,
-         season_guid, tv_guid, tv_trim, tv_title, lib) in rows:
+         _season_guid, tv_guid, tv_trim, tv_title, lib) in rows:
         if ug not in users:  # 已删除账号 / user 表里已不存在的 guid：不统计
             continue
         # resolve show identity

@@ -89,5 +89,23 @@
   无法还原，所以这是「内容时长」的上界，不是实际播放耗时。KPI 上的区间，上界就是未修正
   的位置求和。
   有人习惯「标记已看」而不产生播放位置，所以记录的条数排名和时长排名不一定一致。
+  {% if real_minutes %}
+  下面是播放心跳（15 秒一次，应用从 {{ hb_since }} 开始自己累积）推算的<b>实际播放</b>分钟数——
+  它是下界：暂停不计时、快进少算，但真实发生。{% endif %}
 </div>
+
+{% if real_minutes %}
+<div class="lcard" style="margin-top:14px">
+  <h3>实际播放<span>心跳推算 · 下界</span></h3>
+  {% for u in people %}
+  {% if u.real %}
+  <a class="rk" href="/user/{{ u.name|urlencode }}" style="grid-template-columns:74px 1fr 110px">
+    <span class="nm">{{ u.name }}</span>
+    <span class="bar"><i style="width:{{ (u.real * 100 / real_peak)|round(0)|int }}%"></i></span>
+    <span class="v">{{ u.real // 60 }} 小时 {{ u.real % 60 }} 分</span>
+  </a>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

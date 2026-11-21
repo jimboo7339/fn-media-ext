@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from urllib.parse import quote, urlencode
 
-from . import config, db, posters, watchtime
+from . import config, db, heartbeats, posters, watchtime
 
 PALETTE = ["#5b9cf8", "#f0a44a", "#5fc48a", "#c07ef0", "#e0716f", "#4fc3d9", "#c9a227", "#8f9bb3"]
 WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
@@ -386,6 +386,55 @@ def activity_strip(events: list[dict], state: dict, days: int = 90) -> dict:
     return {"rows": rows, "start": start, "end": today, "months": months, "days": days}
 
 
+def _tonight(evs: list[dict]) -> list[dict]:
+    """「今晚看什么」：在追的剧里挑出有行动价值的几部。
+
+    信号（按优先级）：库里更新了新集、就差两三集看完、断更 ≥7 天。
+    口径与剧集矩阵一致（按人×剧），集数只认库里 Season 树中真实存在的集；
+    快照不可用时安静退化——只剩「断更」信号，卡片照样有用。
+    """
+    progress: dict[tuple[str, str], dict] = {}
+    for e in sorted(evs, key=lambda x: x["event_time"]):
+        k = (e["user_name"], e["show_key"])
+        cur = progress.setdefault(k, {"done_max": 0, "seen_max": 0, "last": 0, "e": e})
+        ep = e["episode"] or 0
+        cur["seen_max"] = max(cur["seen_max"], ep)
+        if e["watched"] or (e["pct"] or 0) >= 98:
+            cur["done_max"] = max(cur["done_max"], ep)
+        if e["event_time"] >= cur["last"]:
+            cur["last"] = e["event_time"]
+            cur["e"] = e
+    if not progress:
+        return []
+    lib = library_episodes(sorted({k[1] for k in progress}))
+    now = now_ms()
+    out = []
+    for (user, key), p in progress.items():
+        e = p["e"]
+        if e["watched"] or (e["pct"] is not None and e["pct"] >= 98):
+            continue  # 这个人已看完这部剧
+        info = lib.get(key)
+        lib_max = (info["episode"] if info else 0) or 0
+        idle = max(0, (now - p["last"]) // config.DAY_MS)
+        if lib_max and p["seen_max"] < lib_max:
+            reason = f"库里更新到 E{lib_max}"
+        elif lib_max and lib_max >= 3 and lib_max - p["done_max"] <= 2:
+            reason = f"就差 {lib_max - p['done_max']} 集看完"
+        elif idle >= 7:
+            reason = f"停了 {idle} 天"
+        else:
+            continue
+        out.append({
+            "show": e["show_title"], "key": key, "user": user,
+            "color": color_of(user), "ep": episode_code(e["season"], e["episode"]),
+            "reason": reason, "last": p["last"], "idle": idle,
+            "poster": e["poster"] or "", "hue": hue_of(e["show_title"]),
+            "initial": initial(e["show_title"]),
+        })
+    out.sort(key=lambda x: -x["last"])
+    return out[:4]
+
+
 def _rail(evs: list[dict], all_events: list[dict], state: dict) -> dict:
     latest: dict[tuple[str, str], dict] = {}
     for e in sorted(evs, key=lambda x: x["event_time"]):
@@ -425,7 +474,12 @@ def _rail(evs: list[dict], all_events: list[dict], state: dict) -> dict:
         if len(v) >= 2
     ][:6]
 
-    return {"progress": progress, "duo": duo, "excluded": excluded_summary(all_events, state)}
+    return {
+        "progress": progress,
+        "duo": duo,
+        "tonight": _tonight(visible(all_events, state, days=0)),
+        "excluded": excluded_summary(all_events, state),
+    }
 
 
 RANGES = (7, 30, 90, 0)
@@ -1133,6 +1187,11 @@ def stats_context() -> dict:
     for u in people:
         u["pct"] = round(u["minutes"] * 100 / peak_min) if peak_min else 0
 
+    # 心跳推算的「实际播放」分钟数：从采集开始才有数据，0 表示还没有样本
+    real = heartbeats.real_minutes()
+    for u in people:
+        u["real"] = real.get(u["name"], 0)
+
     shows = _show_index(evs)
     by_events = shows[:12]
     by_minutes = [s for s in sorted(shows, key=lambda s: -s["minutes"]) if s["minutes"] > 0][:12]
@@ -1148,6 +1207,9 @@ def stats_context() -> dict:
         "people": people,
         "by_events": by_events,
         "by_minutes": by_minutes,
+        "real_minutes": real,
+        "real_peak": max(real.values()) if real else 1,
+        "hb_since": heartbeats.first_captured(),
         "kpis": {
             "events": event_count(evs),
             "raw": len(evs),

@@ -204,4 +204,11 @@
   function each(list, fn) {
     Array.prototype.forEach.call(list, fn);
   }
+
+  /* ---------------- PWA：注册 service worker ---------------- */
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").catch(function () {});
+    });
+  }
 })();

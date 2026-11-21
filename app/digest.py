@@ -179,6 +179,34 @@ def _ep_range(eps: list[tuple[int, int]]) -> str:
     return f"{_ep_code(*first)} 起 {len(eps)} 集"
 
 
+def _is_night(ms: int) -> bool:
+    """22:30–06:00（展示时区）——孩子该睡觉的时段。"""
+    t = datetime.fromtimestamp(ms / 1000, config.TZ)
+    return t.hour < 6 or t.hour > 22 or (t.hour == 22 and t.minute >= 30)
+
+
+def _alerts(evs: list[dict], people_rows: list[dict]) -> list[str]:
+    """阈值提醒：两道护栏，规则刻意用环境变量写死，不做规则引擎。
+
+    ALERT_DAILY_MINUTES：单人单日估算时长上限（0 关闭）；
+    ALERT_NIGHT：22:30–06:00 仍有播放记录就点名（默认关闭）。"""
+    out: list[str] = []
+    if config.ALERT_DAILY_MINUTES > 0:
+        for p in people_rows:
+            if p["minutes"] >= config.ALERT_DAILY_MINUTES:
+                out.append(f'{p["name"]} 当天看了 {_hm(p["minutes"])}')
+    if config.ALERT_NIGHT:
+        seen: set[str] = set()
+        for e in sorted((e for e in evs if _is_night(e["event_time"])),
+                        key=lambda x: x["event_time"]):
+            if e["user_name"] in seen:
+                continue
+            seen.add(e["user_name"])
+            out.append(f'{e["user_name"]} 深夜 {queries.clock(e["event_time"])} '
+                       f'还在看《{e["show_title"]}》{queries.episode_label(e)}')
+    return out
+
+
 def build(day: date) -> dict:
     events = queries.allowed_events()
     evs = [e for e in events if queries.day_of(e["event_time"]) == day]
@@ -336,6 +364,7 @@ def build(day: date) -> dict:
         "people": people_rows,
         "shows": show_rows,
         "additions": add,
+        "alerts": _alerts(evs, people_rows),
     }
 
 
@@ -406,6 +435,11 @@ def blocks(report: dict, link: str = "") -> list[dict]:
             out.append({"t": "line", "text": g["label"]})
         if add["groups"] > 8:
             out.append({"t": "line", "text": f'… 另有 {add["groups"] - 8} 部'})
+
+    if report.get("alerts"):
+        out.append({"t": "h", "text": "⚠️ 提醒"})
+        for a in report["alerts"]:
+            out.append({"t": "line", "text": f'⚠️ {a}'})
 
     if link:
         out.append({"t": "link", "text": "查看当天看板", "url": f'{link}/digest?day={report["day"]}'})

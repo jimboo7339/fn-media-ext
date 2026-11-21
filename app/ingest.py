@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import config, db
+from . import config, db, heartbeats
 
 logger = logging.getLogger("fnxt.sync")
 
@@ -385,12 +385,20 @@ def sync_all(force: bool = False) -> dict:
         try:
             events, stats = build_events(con, ext)
             catalogs = _catalogs(events, stats)
+            users_map = _users(con)  # 心跳按 guid→用户名 落库，与观看记录同口径
         finally:
             con.close()
             ext.close()
         _write(events, stats, catalogs)
+        # 心跳采集与事件重建相互独立，失败不影响同步结果
+        captured = 0
+        try:
+            captured = heartbeats.capture(paths.get("trimactivity.db"), users_map).get("captured", 0)
+        except Exception:  # noqa: BLE001 - 数据继续攒，服务不能停
+            logger.exception("心跳采集失败")
         _STATE["synced_at"] = time.time()
-        return {"events": len(events), "shows": stats["shows"], "posters": stats["posters"]}
+        return {"events": len(events), "shows": stats["shows"], "posters": stats["posters"],
+                "heartbeats": captured}
     except Exception as exc:  # noqa: BLE001 - reported to the UI
         with db.session_scope() as c:
             c.execute(

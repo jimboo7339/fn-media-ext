@@ -4,10 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#080a0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>{% block title %}观影时间线{% endblock %}</title>
 {% from "_macros.html" import themeboot, themebar, mark %}
 {{ themeboot() }}
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/app.css?v={{ version }}">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/static/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
@@ -122,6 +125,6 @@
   <button type="button" id="more-btn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>更多</button>
 </nav>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{ version }}"></script>
 </body>
 </html>

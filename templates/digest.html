@@ -119,6 +119,16 @@
       <div class="empty" style="padding:24px 0">这天没有新剧集或电影入库</div>
       {% endif %}
     </div>
+
+    {% if report.alerts %}
+    <div class="lcard">
+      <h3>⚠️ 提醒<span>阈值护栏</span></h3>
+      {% for a in report.alerts %}
+      <div class="note" style="padding:6px 0;border-bottom:1px solid var(--line);color:var(--banner-fg)">{{ a }}</div>
+      {% endfor %}
+      <div class="note" style="margin-top:8px">规则由环境变量配置：ALERT_DAILY_MINUTES（单人单日时长上限）、ALERT_NIGHT（22:30–06:00 深夜观看）。</div>
+    </div>
+    {% endif %}
   </div>
 
   <aside class="rail">

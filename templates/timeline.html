@@ -77,6 +77,19 @@
   </div>
 
   <aside class="rail">
+    {% if rail.tonight %}
+    <div class="card">
+      <h3>今晚看什么<span>{{ rail.tonight|length }} 部</span></h3>
+      {% for t in rail.tonight %}
+      <div class="now">
+        {{ poster(t.poster, t.hue, t.initial) }}
+        <div class="m"><b><a class="lnk" href="/show/{{ t.key|urlencode }}">{{ t.show }}</a></b>
+          <div class="s"><span>{{ t.reason }}</span><span>{{ t.user }}</span></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="card">
       <h3>正在追<span>{{ rail.progress|length }} 部</span></h3>
       {% for p in rail.progress %}

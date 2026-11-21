@@ -45,7 +45,6 @@ for _cand in (BASE_DIR, BASE_DIR.parent):
         break
 
 from app import config, db  # noqa: E402
-from app.meta import LABELS, _labels  # noqa: E402
 
 API_PATH = "/v/api/v1/item/refresh"
 
@@ -155,8 +154,6 @@ def main() -> int:
     results = []
     for t in targets:
         guids = map_to_live_guids(con, t["show_key"])
-        labels = "、".join(_labels(t["missing"] or "", t["ep_total"] and
-                                   {"eps": t["ep_total"]}))
         if not guids:
             print(f"  跳过 {t['title']!r}：找不到活库副本（只存在于已删除的媒体库）")
             results.append((t, None, "无活库副本"))
@@ -178,7 +175,7 @@ def main() -> int:
     # 记录请求时间；失败的也记（避免反复打一个坏接口），下次过期后会重试
     now = int(time.time() * 1000)
     with db.session_scope() as con:
-        for t, guids, err in results:
+        for t, guids, _err in results:
             if guids:
                 con.execute("UPDATE meta_probe SET requested_at=? WHERE show_key=?",
                             (now, t["show_key"]))

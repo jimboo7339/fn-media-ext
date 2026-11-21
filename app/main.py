@@ -167,6 +167,7 @@ def shell(request: Request, page: str, **extra) -> dict:
         "account": request.state.account,
         "nav_q": "",
         "csrf": auth.csrf_token(sid),
+        "version": config.APP_VERSION,
         "synced": _fmt_time(state.get("synced_at")),
         "sync_error": state.get("error"),
     }
@@ -560,6 +561,24 @@ def favicon():
 def api_refresh():
     """运维端点：只触发一次快照同步，效果温和，靠会话 cookie 鉴权即可，豁免 CSRF。"""
     return JSONResponse(ingest.sync_all(force=True))
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    # SW 脚本本体必须每次拿最新的，不能让浏览器或它自己的缓存拖住升级
+    resp = FileResponse(
+        config.BASE_DIR / "static" / "sw.js", media_type="application/javascript"
+    )
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def webmanifest():
+    return FileResponse(
+        config.BASE_DIR / "static" / "manifest.webmanifest",
+        media_type="application/manifest+json",
+    )
 
 
 @app.get("/apple-touch-icon.png")

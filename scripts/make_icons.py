@@ -118,7 +118,11 @@ def main() -> int:
     # iOS 会自己切圆角，这里给全出血的方图
     render(180, rounded=False).save(STATIC / "apple-touch-icon.png")
 
-    for name in ("favicon.ico", "apple-touch-icon.png"):
+    # PWA：manifest 图标。全出血方图同时可当 maskable 用（标记居中，四边有余量）
+    render(192, rounded=False).save(STATIC / "icon-192.png")
+    render(512, rounded=False).save(STATIC / "icon-512.png")
+
+    for name in ("favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"):
         p = STATIC / name
         print(f"{p.relative_to(STATIC.parent)}  {p.stat().st_size:,} B")
     return 0

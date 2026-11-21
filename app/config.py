@@ -42,7 +42,13 @@ PREVIEW_AUTOLOGIN = os.getenv("PREVIEW_AUTOLOGIN", "") == "1"
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "") in ("1", "true", "yes")
 
 # 随 /health 暴露、随版本一起发；发版打 tag 时同步改这里
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.5.0"
+
+# ---- 阈值提醒（结果并进每日日报推送）----
+# 单人单日观看时长上限（分钟），0 = 关闭。估算口径与 /stats 相同。
+ALERT_DAILY_MINUTES = int(os.getenv("ALERT_DAILY_MINUTES", "0") or 0)
+# 深夜观看提醒（22:30–06:00 还有播放记录），默认关闭
+ALERT_NIGHT = os.getenv("ALERT_NIGHT", "") in ("1", "true", "yes")
 
 SOURCE_DBS = ("trimmedia.db", "trimmedia_ext.db", "trimactivity.db")
 
