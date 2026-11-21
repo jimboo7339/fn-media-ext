@@ -7,6 +7,7 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from . import config
 
@@ -129,14 +130,64 @@ def session_scope() -> Iterator[sqlite3.Connection]:
 def init() -> None:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     config.SNAP_DIR.mkdir(parents=True, exist_ok=True)
-    with session_scope() as con:
-        con.executescript(SCHEMA)
-        # 老库迁移：meta_probe 建表时可能没有这两列
-        for col in ("ep_missing INTEGER NOT NULL DEFAULT 0", "ep_total INTEGER NOT NULL DEFAULT 0"):
-            try:
-                con.execute(f"ALTER TABLE meta_probe ADD COLUMN {col}")
-            except Exception:  # noqa: BLE001 - 列已存在
-                pass
+    con = connect()
+    try:
+        with con:
+            con.executescript(SCHEMA)
+            # 迁移链：PRAGMA user_version 记录已应用版本，升级时依次执行未应用的步骤。
+            # 单条失败（例如老库已有该列）按幂等处理，不阻塞启动。
+            version = con.execute("PRAGMA user_version").fetchone()[0]
+            for ver, statements in MIGRATIONS:
+                if ver <= version:
+                    continue
+                for sql in statements:
+                    try:
+                        con.execute(sql)
+                    except sqlite3.OperationalError:  # noqa: BLE001 - 列/索引已存在
+                        pass
+                con.execute(f"PRAGMA user_version = {ver}")
+    finally:
+        con.close()
+
+
+SCHEMA_VERSION = 1
+MIGRATIONS: list[tuple[int, tuple[str, ...]]] = [
+    (
+        1,
+        (
+            # 老库的 meta_probe 建表时可能没有这两列
+            "ALTER TABLE meta_probe ADD COLUMN ep_missing INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE meta_probe ADD COLUMN ep_total INTEGER NOT NULL DEFAULT 0",
+            # 页面常按「人+时间」「剧+时间」过滤，复合索引免去全表排序
+            "CREATE INDEX IF NOT EXISTS idx_event_user_time ON watch_event(user_name, event_time)",
+            "CREATE INDEX IF NOT EXISTS idx_event_show_time ON watch_event(show_key, event_time)",
+        ),
+    ),
+]
+
+
+def backup_recent(keep: int = 7) -> Path:
+    """冷备份 app.db 到 DATA_DIR/backups，只留最近 keep 份。
+
+    WAL 库直接 cp 会丢掉 -wal 里未合并的内容；VACUUM INTO 拿到的是
+    单文件一致快照，才是可靠的备份。轮转放在生成之前：同一分钟重复调用
+    也会顺带清掉过期文件。"""
+    dest_dir = config.DATA_DIR / "backups"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"app-{time.strftime('%Y%m%d-%H%M')}.db"
+    if not dest.exists():
+        con = connect()
+        try:
+            con.isolation_level = None  # VACUUM 不能在事务里跑
+            con.execute("VACUUM INTO ?", (str(dest),))
+        finally:
+            con.close()
+    for old in sorted(dest_dir.glob("app-*.db"))[:-keep]:
+        try:
+            old.unlink()
+        except OSError:  # noqa: BLE001 - 被占用就留给下一轮清理
+            pass
+    return dest
 
 
 # ---------------------------------------------------------------- settings

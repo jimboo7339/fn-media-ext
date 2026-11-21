@@ -7,15 +7,17 @@ WAL mount) and only the copies are queried.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import sqlite3
 import threading
 import time
-import traceback
 from pathlib import Path
 
 from . import config, db
+
+logger = logging.getLogger("fnxt.sync")
 
 _LOCK = threading.Lock()
 _STATE = {"synced_at": 0, "busy": False}
@@ -396,7 +398,7 @@ def sync_all(force: bool = False) -> dict:
                 "VALUES(1, ?, 0, 0, 0, ?) ON CONFLICT(id) DO UPDATE SET error=excluded.error",
                 (int(time.time() * 1000), f"{exc}"),
             )
-        traceback.print_exc()
+        logger.exception("快照同步失败")
         return {"error": str(exc)}
     finally:
         _STATE["busy"] = False

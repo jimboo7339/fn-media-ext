@@ -20,8 +20,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    name: lint & tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: 安装依赖
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff
+        run: ruff check app tests
+
+      - name: pytest
+        run: pytest tests -q
+
   verify:
     name: 构建并冒烟测试
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -99,11 +123,12 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: 构建并推送
+      - name: 构建并推送（amd64 + arm64，群晖/树莓派可用）
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

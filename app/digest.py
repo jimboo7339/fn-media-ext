@@ -23,6 +23,7 @@ import hmac
 import html as _html
 import io
 import json
+import logging
 import threading
 import time
 import urllib.error
@@ -42,6 +43,8 @@ except ImportError:  # pragma: no cover
     card = None  # type: ignore[assignment]
 
 from . import additions, config, db, ingest, queries
+
+logger = logging.getLogger("fnxt.digest")
 
 # --------------------------------------------------------------- 配置
 KINDS = (
@@ -532,8 +535,7 @@ def card_png(day: date, fresh: bool = False) -> bytes | None:
     try:
         png = card.render(build(day))
     except Exception:  # noqa: BLE001 - 渲染失败要退回文字，不能拖垮推送
-        import traceback
-        traceback.print_exc()
+        logger.exception("日报卡片渲染失败，退回纯文字")
         png = None
     if png:
         _CARD_CACHE[key] = (time.time(), png)

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import hmac as _hmac
+import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from urllib.parse import quote
@@ -15,6 +17,18 @@ from fastapi.templating import Jinja2Templates
 
 from . import auth, config, db, digest, ingest, live, meta, posters, queries, quiet
 
+logger = logging.getLogger("fnxt")
+
+
+def _refuse_multi_worker() -> None:
+    """单例后台任务（快照同步、日报推送）的锁都在进程内，多 worker 会重复推送。"""
+    raw = os.getenv("WEB_CONCURRENCY", "").strip()
+    if raw.isdigit() and int(raw) > 1:
+        raise RuntimeError(
+            f"WEB_CONCURRENCY={raw}：本应用不支持多进程部署（同步与日报是单例任务）。"
+            "请保持单 worker；要横向扩展时把同步与日报拆到独立容器。"
+        )
+
 
 async def _periodic_sync() -> None:
     interval = max(60, config.SNAPSHOT_MINUTES * 60)
@@ -22,8 +36,8 @@ async def _periodic_sync() -> None:
         await asyncio.sleep(interval)
         try:
             await asyncio.to_thread(ingest.sync_all)
-        except Exception:  # noqa: BLE001 - keep the loop alive
-            pass
+        except Exception:  # noqa: BLE001 - 保活循环，但必须留下痕迹
+            logger.exception("定时同步失败")
 
 
 async def _digest_loop() -> None:
@@ -33,11 +47,27 @@ async def _digest_loop() -> None:
         try:
             await asyncio.to_thread(digest.tick)
         except Exception:  # noqa: BLE001 - 推送失败不能拖垮应用
-            pass
+            logger.exception("日报定时推送失败")
+
+
+async def _backup_loop() -> None:
+    """app.db 每天冷备一次（VACUUM INTO），只留最近 7 份。"""
+    while True:
+        await asyncio.sleep(6 * 3600)
+        try:
+            await asyncio.to_thread(db.backup_recent)
+        except Exception:  # noqa: BLE001 - 备份失败不影响服务
+            logger.exception("app.db 备份失败")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    _refuse_multi_worker()
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
     db.init()
     ingest.seed_defaults()
     if config.PREVIEW_AUTOLOGIN and auth.account_count() == 0:
@@ -46,11 +76,12 @@ async def lifespan(_app: FastAPI):
     await asyncio.to_thread(posters.build_index)
     sync_task = asyncio.create_task(_periodic_sync())
     digest_task = asyncio.create_task(_digest_loop())
+    backup_task = asyncio.create_task(_backup_loop())
     try:
         yield
     finally:
-        sync_task.cancel()
-        digest_task.cancel()
+        for task in (sync_task, digest_task, backup_task):
+            task.cancel()
 
 
 app = FastAPI(title="观影时间线", lifespan=lifespan, docs_url=None, redoc_url=None)

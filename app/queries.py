@@ -17,10 +17,24 @@ def now_ms() -> int:
     return int(datetime.now(config.TZ).timestamp() * 1000)
 
 
+_EVENT_CACHE: dict = {}
+
+
 def load_events() -> list[dict]:
-    with db.session_scope() as con:
-        rows = con.execute("SELECT * FROM watch_event ORDER BY event_time DESC").fetchall()
-    return [dict(r) for r in rows if r["event_time"]]
+    """全量事件，按 (synced_at, events) 做进程内缓存。
+
+    每个页面都要这一份全量数据做过滤聚合，是最大的固定成本；同步成功时
+    sync_state.synced_at 必然变化（毫秒时间戳），用它当失效键足够可靠。
+    返回浅拷贝：调用方可以随意排序、增删，不会污染缓存。
+    """
+    state = db.sync_state() or {}
+    key = (state.get("synced_at"), state.get("events"))
+    if _EVENT_CACHE.get("key") != key:
+        with db.session_scope() as con:
+            rows = con.execute("SELECT * FROM watch_event ORDER BY event_time DESC").fetchall()
+        _EVENT_CACHE["key"] = key
+        _EVENT_CACHE["rows"] = [dict(r) for r in rows if r["event_time"]]
+    return list(_EVENT_CACHE["rows"])
 
 
 def day_of(ms: int) -> date:
@@ -278,6 +292,11 @@ def default_filters(path: str = "/", days: int = 30) -> dict:
 
 
 def _feed_items(rows: list[dict]) -> list[dict]:
+    # 批量组的成员先按组索引一次；组内线性扫会让大日子退化成 O(rows²)
+    members_by_group: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        if r["bulk_group"]:
+            members_by_group[r["bulk_group"]].append(r)
     seen_groups: set[str] = set()
     out: list[dict] = []
     for e in rows:
@@ -286,7 +305,7 @@ def _feed_items(rows: list[dict]) -> list[dict]:
             if group in seen_groups:
                 continue
             seen_groups.add(group)
-            members = [r for r in rows if r["bulk_group"] == group]
+            members = members_by_group[group]
             shows = []
             for m in members:
                 if m["show_title"] not in shows:
@@ -394,11 +413,13 @@ def _rail(evs: list[dict], all_events: list[dict], state: dict) -> dict:
 
     by_show: dict[str, set[str]] = defaultdict(set)
     last_seen: dict[str, int] = defaultdict(int)
+    titles: dict[str, str] = {}
     for e in evs:
         by_show[e["show_key"]].add(e["user_name"])
         last_seen[e["show_key"]] = max(last_seen[e["show_key"]], e["event_time"])
+        titles.setdefault(e["show_key"], e["show_title"])
     duo = [
-        {"show": next(x["show_title"] for x in evs if x["show_key"] == k), "key": k,
+        {"show": titles.get(k, ""), "key": k,
          "users": sorted(v), "n": len(v)}
         for k, v in sorted(by_show.items(), key=lambda kv: -last_seen[kv[0]])
         if len(v) >= 2
@@ -972,8 +993,9 @@ def recap_context(mode: str, period: str) -> dict:
         d = max(days, key=lambda k: days[k])
         busiest = {"date": f"{d.month} 月 {d.day} 日", "weekday": WEEKDAYS[d.weekday()], "n": days[d]}
 
-    shows = [s for s in _show_index(cur)][:6]
-    people = [u for u in _people_index(cur)]
+    cur_shows = _show_index(cur)  # 本函数原来在三个地方各算一遍，这里算一次
+    shows = cur_shows[:6]
+    people = _people_index(cur)
     for u in people:
         u["max_events"] = people[0]["events"] if people else 1
     people = people[:8]
@@ -982,7 +1004,7 @@ def recap_context(mode: str, period: str) -> dict:
     start = min((e["event_time"] for e in cur), default=0)
     end = max((e["event_time"] for e in cur), default=0)
     fresh = [
-        s for s in _show_index(cur)
+        s for s in cur_shows
         if start and start <= born.get(s["key"], 0) <= end and s["events"] >= 1
     ][:8]
 
@@ -1077,8 +1099,7 @@ def dropout_context(days: int) -> dict:
     per_show = Counter(r["show"] for r in rows)
     show_keys = {r["show"]: r["key"] for r in rows}
     user_rows = [
-        {"name": u, "n": n, "color": color_of(u), "initial": initial(u),
-         "events": sum(1 for r in rows if r["user"] == u)}
+        {"name": u, "n": n, "color": color_of(u), "initial": initial(u), "events": n}
         for u, n in per_user.most_common()
     ]
     peak = user_rows[0]["n"] if user_rows else 1
