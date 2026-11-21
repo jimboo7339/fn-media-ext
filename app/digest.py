@@ -23,7 +23,6 @@ import hmac
 import html as _html
 import io
 import json
-import secrets
 import threading
 import time
 import urllib.error
@@ -544,11 +543,7 @@ def card_png(day: date, fresh: bool = False) -> bytes | None:
 
 
 def _secret() -> str:
-    secret = db.get_setting("digest_secret")
-    if not secret:
-        secret = secrets.token_hex(16)
-        db.set_setting("digest_secret", secret)
-    return secret
+    return db.secret_setting("digest_secret")
 
 
 def card_sig(day: date) -> str:
@@ -617,7 +612,7 @@ def _feishu_sign(secret: str, timestamp: str) -> str:
 
     注意这里 HMAC 的 key 是「timestamp\\nsecret」，待签内容是空串——和钉钉正好相反。
     """
-    key = f"{timestamp}\n{secret}".encode("utf-8")
+    key = f"{timestamp}\n{secret}".encode()
     return base64.b64encode(hmac.new(key, b"", digestmod=hashlib.sha256).digest()).decode("utf-8")
 
 

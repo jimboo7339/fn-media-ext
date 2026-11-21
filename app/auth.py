@@ -80,11 +80,30 @@ def account_by_token(token: str | None) -> dict | None:
     now = int(time.time() * 1000)
     with db.session_scope() as con:
         row = con.execute(
-            "SELECT a.* FROM session s JOIN account a ON a.id = s.account_id "
+            "SELECT a.*, s.expires_at AS session_expires_at "
+            "FROM session s JOIN account a ON a.id = s.account_id "
             "WHERE s.token = ? AND s.expires_at > ?",
             (token, now),
         ).fetchone()
+        if not row:
+            return None
+        # 滑动续期：会话用掉一半还活着，就再把有效期拉回满格，活跃用户不用每 30 天重登
+        if row["session_expires_at"] - now < SESSION_SECONDS * 1000 // 2:
+            con.execute(
+                "UPDATE session SET expires_at = ? WHERE token = ?",
+                (now + SESSION_SECONDS * 1000, token),
+            )
     return dict(row) if row else None
+
+
+def csrf_token(session_token: str) -> str:
+    """从会话 token 派生的同步器令牌：表单里携带、POST 时比对，挡住跨站表单提交。
+
+    派生而不是存表——不需要额外的存储，会话失效令牌自然失效。"""
+    if not session_token:
+        return ""
+    key = db.secret_setting("app_secret").encode()
+    return hmac.new(key, ("csrf:" + session_token).encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def destroy_session(token: str | None) -> None:

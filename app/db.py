@@ -1,10 +1,12 @@
 """SQLite access for the app's own database (accounts, settings, derived events)."""
 from __future__ import annotations
 
+import secrets
 import sqlite3
+import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from . import config
 
@@ -161,6 +163,24 @@ def set_setting(key: str, value: str) -> None:
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value),
         )
+
+
+_SECRET_LOCK = threading.Lock()
+
+
+def secret_setting(key: str) -> str:
+    """Read a random secret, create and persist it on first use.
+
+    Check-then-write must be serialized: two threads racing here would each
+    generate a secret and one of them would silently invalidate signatures
+    already sent out (card links, CSRF tokens).
+    """
+    with _SECRET_LOCK:
+        val = get_setting(key)
+        if not val:
+            val = secrets.token_hex(16)
+            set_setting(key, val)
+        return val
 
 
 # -------------------------------------------------------------- digest log

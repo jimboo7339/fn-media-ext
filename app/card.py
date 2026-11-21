@@ -114,7 +114,7 @@ def _mix(a: str, b: str, t: float) -> tuple[int, int, int]:
 
 def _hm(minutes: int) -> str:
     """「4 小时 52 分」。口径和页面上一致，实现在 queries.hm()。"""
-    from . import queries          # 延迟导入：queries 那边也用到本模块的常量
+    from . import queries  # 延迟导入：queries 那边也用到本模块的常量
     return queries.hm(minutes)
 
 

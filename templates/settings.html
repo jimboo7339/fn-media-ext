@@ -4,6 +4,7 @@
 {% block sub %}数据源与排除项{% endblock %}
 {% block tools %}
 <form method="post" action="/settings/refresh">
+  {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
   <button class="btn" type="submit">立即同步</button>
 </form>
 {% endblock %}
@@ -23,6 +24,7 @@
     <form method="post" action="/settings/toggle">
       <input type="hidden" name="scope" value="library">
       <input type="hidden" name="target" value="{{ item.name }}">
+      {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
       <button class="chipbtn {{ 'on' if item.excluded }}" type="submit">{{ item.name }}<span class="c">{{ item.events }}</span></button>
     </form>
     {% endfor %}
@@ -33,6 +35,7 @@
     <form method="post" action="/settings/toggle">
       <input type="hidden" name="scope" value="account">
       <input type="hidden" name="target" value="{{ item.name }}">
+      {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
       <button class="chipbtn {{ 'on' if item.excluded }}" type="submit">{{ item.name }}<span class="c">{{ item.events }}</span></button>
     </form>
     {% endfor %}
@@ -59,8 +62,9 @@
   <h2>账号</h2>
   <p class="hint">当前登录：<b>{{ account.username }}</b>。修改密码后需要重新登录。</p>
   <form class="form" method="post" action="/settings/password">
-    <input type="password" name="old" placeholder="当前密码" autocomplete="current-password">
-    <input type="password" name="new" placeholder="新密码（至少 6 位）" autocomplete="new-password">
+    {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
+    <input type="password" name="old" placeholder="当前密码" aria-label="当前密码" autocomplete="current-password">
+    <input type="password" name="new" placeholder="新密码（至少 6 位）" aria-label="新密码，至少 6 位" autocomplete="new-password">
     <button class="btn" type="submit">修改密码</button>
   </form>
 </div>

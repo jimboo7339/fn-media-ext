@@ -63,7 +63,7 @@ def main(argv: list[str]) -> int:
         keys = [_show_key(tv) for tv in tvs]
         catalog = queries.library_episodes(keys)
         valid = set()
-        for key, hit in catalog.items():
+        for _key, hit in catalog.items():
             valid |= hit["guids"]
 
         print(f"匹配到 {len(tvs)} 部，快照 {snap}\n")

@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import hmac as _hmac
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
-from fastapi import FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -64,6 +65,26 @@ def _fmt_time(ms: int | None) -> str:
     return datetime.fromtimestamp(ms / 1000, config.TZ).strftime("%m-%d %H:%M")
 
 
+async def csrf_check(request: Request) -> None:
+    """表单 POST 的 CSRF 防护（同步器令牌），以依赖的形式挂在每个 POST 路由上。
+
+    不做成 BaseHTTPMiddleware：中间件里 `await request.form()` 读完的表单不会
+    回放给下游，handler 拿到的就是空表单（实测 422）。依赖与 handler 共享同一个
+    Request，body 只解析一次。令牌由会话 token 派生（auth.csrf_token），模板在
+    渲染表单时埋进隐藏字段；tests/test_csrf_flow.py 强制每个 POST 路由都挂它。"""
+    if config.PREVIEW_AUTOLOGIN:
+        return
+    sid = request.cookies.get("sid") or ""
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001 - 解析不出表单一律拒绝
+        form = {}
+    supplied = str(form.get("csrf") or "")
+    expected = auth.csrf_token(sid)
+    if not sid or not supplied or not _hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=403, detail="csrf token missing or invalid")
+
+
 @app.middleware("http")
 async def auth_guard(request: Request, call_next):
     path = request.url.path
@@ -105,11 +126,13 @@ async def freshness(request: Request, call_next):
 
 def shell(request: Request, page: str, **extra) -> dict:
     state = db.sync_state() or {}
+    sid = request.cookies.get("sid") or ""
     ctx = {
         "request": request,
         "page": page,
         "account": request.state.account,
         "nav_q": "",
+        "csrf": auth.csrf_token(sid),
         "synced": _fmt_time(state.get("synced_at")),
         "sync_error": state.get("error"),
     }
@@ -258,7 +281,7 @@ def _digest_form(on, at, mode, kind, url, chat, link, skip_empty, form,
     )
 
 
-@app.post("/digest/save")
+@app.post("/digest/save", dependencies=[Depends(csrf_check)])
 def digest_save(
     on: str = Form(""),
     at: str = Form("09:00"),
@@ -278,7 +301,7 @@ def digest_save(
     return RedirectResponse("/digest?saved=1", 303)
 
 
-@app.post("/digest/send")
+@app.post("/digest/send", dependencies=[Depends(csrf_check)])
 def digest_send(day: str = Form("")):
     target = digest.parse_day(day) or digest.default_day()
     ingest.maybe_sync()  # 点「立即推送」时不想拿到十分钟前的数据
@@ -290,7 +313,7 @@ def digest_send(day: str = Form("")):
     )
 
 
-@app.post("/digest/test")
+@app.post("/digest/test", dependencies=[Depends(csrf_check)])
 def digest_test(
     on: str = Form(""),
     at: str = Form("09:00"),
@@ -398,7 +421,8 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
     token = auth.new_session(account["id"])
     target = next if next.startswith("/") and not next.startswith("//") else "/"
     resp = RedirectResponse(target, 303)
-    resp.set_cookie("sid", token, max_age=auth.SESSION_SECONDS, httponly=True, samesite="lax")
+    resp.set_cookie("sid", token, max_age=auth.SESSION_SECONDS, httponly=True,
+                    samesite="lax", secure=config.COOKIE_SECURE)
     return resp
 
 
@@ -414,11 +438,12 @@ def setup_submit(request: Request, username: str = Form(...), password: str = Fo
     account = auth.check_login(username, password)
     token = auth.new_session(account["id"])
     resp = RedirectResponse("/", 303)
-    resp.set_cookie("sid", token, max_age=auth.SESSION_SECONDS, httponly=True, samesite="lax")
+    resp.set_cookie("sid", token, max_age=auth.SESSION_SECONDS, httponly=True,
+                    samesite="lax", secure=config.COOKIE_SECURE)
     return resp
 
 
-@app.post("/logout")
+@app.post("/logout", dependencies=[Depends(csrf_check)])
 def logout(request: Request):
     auth.destroy_session(request.cookies.get("sid"))
     resp = RedirectResponse("/login", 303)
@@ -427,14 +452,14 @@ def logout(request: Request):
 
 
 # ----------------------------------------------------------------- settings
-@app.post("/settings/toggle")
+@app.post("/settings/toggle", dependencies=[Depends(csrf_check)])
 def toggle_exclusion(scope: str = Form(...), target: str = Form(...)):
     if scope in ("library", "account") and target:
         db.toggle_exclusion(scope, target)
     return RedirectResponse("/settings?done=1", 303)
 
 
-@app.post("/settings/password")
+@app.post("/settings/password", dependencies=[Depends(csrf_check)])
 def change_password(request: Request, old: str = Form(...), new: str = Form(...)):
     ok = auth.change_password(request.state.account["id"], old, new)
     if not ok:
@@ -444,7 +469,7 @@ def change_password(request: Request, old: str = Form(...), new: str = Form(...)
     return resp
 
 
-@app.post("/settings/refresh")
+@app.post("/settings/refresh", dependencies=[Depends(csrf_check)])
 def refresh_now():
     result = ingest.sync_all(force=True)
     flag = "err" if "error" in result else "ok"
@@ -474,8 +499,16 @@ def image(path: str):
 
 @app.get("/health")
 def health():
-    state = db.sync_state() or {}
-    body = {"ok": True, "synced_at": state.get("synced_at"), "events": state.get("events")}
+    body: dict = {"ok": True, "version": config.APP_VERSION}
+    try:
+        state = db.sync_state() or {}
+        body["synced_at"] = state.get("synced_at")
+        body["events"] = state.get("events")
+        body["sync_error"] = state.get("error") or None
+    except Exception as exc:  # noqa: BLE001 - 健康检查必须如实反映数据库故障
+        body["ok"] = False
+        body["error"] = f"app.db unavailable: {exc}"
+        return JSONResponse(body, status_code=500)
     body.update(quiet.stats())
     return JSONResponse(body)
 
@@ -488,12 +521,8 @@ def favicon():
 
 @app.post("/api/refresh")
 def api_refresh():
+    """运维端点：只触发一次快照同步，效果温和，靠会话 cookie 鉴权即可，豁免 CSRF。"""
     return JSONResponse(ingest.sync_all(force=True))
-
-
-@app.get("/favicon.ico")
-def favicon():
-    return Response(status_code=204)
 
 
 @app.get("/apple-touch-icon.png")

@@ -38,6 +38,12 @@ except Exception:  # noqa: BLE001 - Windows without tzdata
 # 仅供本地预览：跳过登录。生产环境不要设置。
 PREVIEW_AUTOLOGIN = os.getenv("PREVIEW_AUTOLOGIN", "") == "1"
 
+# 反向代理出口走 HTTPS 时设 COOKIE_SECURE=1，登录 cookie 将不再走明文连接
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "") in ("1", "true", "yes")
+
+# 随 /health 暴露、随版本一起发；发版打 tag 时同步改这里
+APP_VERSION = "1.2.0"
+
 SOURCE_DBS = ("trimmedia.db", "trimmedia_ext.db", "trimactivity.db")
 
 # 已删除媒体库的条目在飞牛的 item_ancestor 里还留着指针，它们的播放记录没有归属。

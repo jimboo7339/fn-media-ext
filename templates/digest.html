@@ -15,6 +15,7 @@
 </div>
 <form method="post" action="/digest/send">
   <input type="hidden" name="day" value="{{ day }}">
+  {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
   <button class="btn primary" type="submit">立即推送</button>
 </form>
 {% endblock %}
@@ -167,6 +168,7 @@
     「保存并发送测试」会带上最近一天的卡片，企业微商会收到文字和图片两条。
   </p>
   <form class="dgrid" method="post" action="/digest/save">
+    {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
     <label class="opt chk"><input type="checkbox" name="on" value="1" {{ 'checked' if conf.on }}> 每天自动推送</label>
     <label class="opt">推送时间<input type="time" name="at" value="{{ conf.at }}"></label>
     <label class="opt">统计哪一天

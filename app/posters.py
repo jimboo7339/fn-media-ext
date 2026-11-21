@@ -38,6 +38,17 @@ def build_index(force: bool = False) -> int:
         _LOCK.release()
 
 
+def _safe(p: Path) -> Path | None:
+    """解析符号链接后必须仍位于图片根目录内，防止索引或直接路径越界。"""
+    try:
+        real = p.resolve()
+        if real.is_relative_to(config.IMG_ROOT.resolve()):
+            return real
+    except OSError:  # noqa: BLE001 - resolve 失败就当不存在
+        pass
+    return None
+
+
 def resolve(rel: str) -> Path | None:
     rel = (rel or "").lstrip("/")
     if not rel or ".." in rel.split("/"):
@@ -45,19 +56,27 @@ def resolve(rel: str) -> Path | None:
     root = config.IMG_ROOT
     direct = root / rel
     if direct.is_file():
-        return direct
+        hit = _safe(direct)
+        if hit:
+            return hit
     name = Path(rel).name
     hit = _INDEX.get(name)
     if hit and hit.is_file():
-        return hit
+        found = _safe(hit)
+        if found:
+            return found
     if not _INDEX:
         build_index()
         hit = _INDEX.get(name)
         if hit and hit.is_file():
-            return hit
+            found = _safe(hit)
+            if found:
+                return found
     fallback = root / name
     if fallback.is_file():
-        return fallback
+        found = _safe(fallback)
+        if found:
+            return found
     return None
 
 

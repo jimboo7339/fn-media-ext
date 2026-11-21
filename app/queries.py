@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import calendar
-import re
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
@@ -636,7 +635,7 @@ def user_context(name: str) -> dict | None:
 
     days = sorted({day_of(e["event_time"]) for e in evs})
     longest = run = 1
-    for prev, cur in zip(days, days[1:]):
+    for prev, cur in zip(days, days[1:], strict=False):
         run = run + 1 if (cur - prev).days == 1 else 1
         longest = max(longest, run)
     now = datetime.now(config.TZ).date()
@@ -840,8 +839,7 @@ def _show_index(evs: list[dict]) -> list[dict]:
         )
         s["events"] += 1
         s["users"].add(e["user_name"])
-        if not e["bulk_group"]:
-            s["items"].add(watchtime.identity(e))   # 同集重复条目只算一集
+        s["items"].add(watchtime.identity(e))   # 同集重复条目只算一集；批量标记的行也是真实看过的一集
         s["last"] = max(s["last"], e["event_time"])
         s["first"] = e["event_time"] if not s["first"] else min(s["first"], e["event_time"])
         if e["watched"] or (e["pct"] or 0) >= 98:
@@ -870,8 +868,7 @@ def _people_index(evs: list[dict]) -> list[dict]:
              "last": 0, "first": 0},
         )
         u["events"] += 1
-        if not e["bulk_group"]:
-            u["items"].add(watchtime.identity(e))   # 同集重复条目只算一集
+        u["items"].add(watchtime.identity(e))   # 同集重复条目只算一集；批量标记的行也是真实看过的一集
         u["shows"].add(e["show_key"])
         u["days"].add(day_of(e["event_time"]))
         u["last"] = max(u["last"], e["event_time"])

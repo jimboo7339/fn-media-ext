@@ -162,7 +162,6 @@ def _scan_rows() -> tuple[list[dict], bool]:
 
 def scan(force: bool = False) -> dict:
     """盘点一次；源库没变化且已有结论时直接复用。"""
-    path = _snapshot()
     try:
         mtime = int(config.SNAP_DIR.joinpath("trimmedia.db").stat().st_mtime)
     except OSError:

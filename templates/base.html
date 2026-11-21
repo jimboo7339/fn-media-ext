@@ -92,7 +92,9 @@
       数据更新至 {{ synced }}<br>
       {% if account %}{{ account.username }} · <a href="#" onclick="document.getElementById('logout').submit();return false">退出</a>{% endif %}
     </div>
-    <form id="logout" method="post" action="/logout" style="display:none"></form>
+    <form id="logout" method="post" action="/logout" style="display:none">
+      {% if csrf %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
+    </form>
   </aside>
 
   <main>

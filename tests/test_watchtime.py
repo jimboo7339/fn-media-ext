@@ -212,6 +212,7 @@ def test_skip_spans_tolerates_a_missing_snapshot():
     """快照还没生成时读配置不能炸，返回空表即可（少扣一点好过算错）。"""
     import tempfile
     from pathlib import Path
+
     from app import config
 
     original = config.SNAP_DIR

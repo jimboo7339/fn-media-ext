@@ -1,0 +1,25 @@
+# 代码检查基线：ruff（CI 与本地同一套配置）。
+# 规则集刻意收敛——这是一个人维护的项目，噪音比遗漏更危险。
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = [
+    "E4",  # pycodestyle 缩进/行内空白类硬错误
+    "E7",  # 语法层面的比较/赋值错误
+    "E9",  # 运行期才炸的语法错误
+    "F",   # pyflakes：未用导入、未定义名、F841
+    "I",   # import 排序
+    "UP",  # 过时写法升级
+    "B",   # 常见陷阱（bugbear）
+]
+ignore = [
+    "UP031",  # digest 里的 % 格式化，改写无收益
+    "B008",   # FastAPI 的 Form(...) 默认参数本来就是函数调用
+]
+
+[lint.per-file-ignores]
+# `?l=`（媒体库筛选）是已经发出去的链接里的参数名，改名等于破坏现有分享链接
+"app/main.py" = ["E741"]
+"app/queries.py" = ["E741"]
+
