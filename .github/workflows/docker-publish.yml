@@ -77,13 +77,26 @@ jobs:
               echo "GET /health -> $body"
               echo "$body" | grep -q '"ok":true'
               echo "冒烟测试通过"
-              exit 0
+              break
             fi
             sleep 2
+            if [ "$i" = 30 ]; then
+              echo "::error::/health 在 60 秒内没有返回可用响应"
+              docker logs smoke || true
+              exit 1
+            fi
           done
-          echo "::error::/health 在 60 秒内没有返回可用响应"
-          docker logs smoke || true
-          exit 1
+          # UI2 模板必须在镜像里（v1.6.0 曾因 Dockerfile 漏拷 templates2，
+          # /health 照样 ok 但带 ui=2 cookie 的页面全部 500）。全新容器没有
+          # 账号，首页会 303 到 /setup；setup 页走同一个双引擎选择器，
+          # 引用了 ui2.css 就证明 templates2 真的在镜像里。
+          if curl -fsSL -m 5 -H "Cookie: fnxt.ui=2" http://127.0.0.1:8787/ | grep -q 'ui2.css'; then
+            echo "UI2 模板确认在镜像中"
+          else
+            echo "::error::镜像缺少 templates2（ui=2 请求没有渲染 UI 2.0）"
+            docker logs smoke || true
+            exit 1
+          fi
 
       - name: 清理容器
         if: always()
