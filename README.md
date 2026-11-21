@@ -27,11 +27,13 @@ UI 2.0 的设计语言（截图：[浅色](docs/images/ui2-light.png) · [深色
 
 ## 快速开始
 
-在 NAS 上准备一个目录（例如 `/vol1/1000/docker/fn-media-ext`），把仓库里的 `Dockerfile`、`docker-compose.yml`、`app/`、`templates/`、`static/`、`requirements.txt` 放进去，然后：
+在 NAS 上准备一个目录（例如 `/vol1/1000/docker/fn-media-ext`），把仓库里的 `Dockerfile`、`docker-compose.yml`、`app/`、`templates/`、**`templates2/`**、`static/`、`requirements.txt` 放进去，然后：
 
 ```bash
 docker compose up -d --build
 ```
+
+> **漏拷 `templates2/` 不会炸**：应用启动时检测到它缺失就自动回退经典版（日志有一条 warning），但 UI 2.0 的 `?ui=2` 会一直显示 1.0——看到这种现象先检查这个目录在不在。
 
 打开 `http://<NAS-IP>:8787`，第一次访问会要求创建管理员账号（只有一个账号，仅自己用）。
 

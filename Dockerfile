@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY templates ./templates
+COPY templates2 ./templates2
 COPY static ./static
 
 RUN mkdir -p /data/app

@@ -73,6 +73,17 @@ def test_ui2_login_page_is_standalone():
     assert 'class="gate"' in r.text
 
 
+def test_missing_templates2_falls_back_to_ui1(monkeypatch):
+    """旧镜像/漏拷 templates2 时，带 ui=2 cookie 的请求必须回退 UI1，而不是 500。"""
+    c = _shared_client()
+    c.cookies.set("fnxt.ui", "2")
+    monkeypatch.setattr(main, "_UI2_AVAILABLE", False)
+    for p in ("/", "/settings"):
+        r = c.get(p)
+        assert r.status_code == 200, f"{p} 回退失败: {r.status_code}"
+        assert "/static/ui2.css" not in r.text, "回退后不得再引用 2.0 样式"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     ok = 0

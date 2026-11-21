@@ -42,7 +42,7 @@ PREVIEW_AUTOLOGIN = os.getenv("PREVIEW_AUTOLOGIN", "") == "1"
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "") in ("1", "true", "yes")
 
 # 随 /health 暴露、随版本一起发；发版打 tag 时同步改这里
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 
 # ---- 阈值提醒（结果并进每日日报推送）----
 # 单人单日观看时长上限（分钟），0 = 关闭。估算口径与 /stats 相同。

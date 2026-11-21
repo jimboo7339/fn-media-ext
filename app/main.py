@@ -94,10 +94,18 @@ tpl2 = Jinja2Templates(directory=str(config.BASE_DIR / "templates2"))
 for _env in (tpl.env, tpl2.env):
     _env.globals.update(color_of=queries.color_of, initial=queries.initial, hue_of=queries.hue_of)
 
+# UI 2.0 可用性在启动时判定一次：镜像/部署目录里缺 templates2 时静默回退 UI1，
+# 而不是让每一个带着 ui=2 cookie 的请求 500（旧镜像 + 新 cookie 的真实事故）。
+_UI2_AVAILABLE = (config.BASE_DIR / "templates2" / "base.html").is_file()
+if not _UI2_AVAILABLE:
+    logging.getLogger("fnxt").warning("templates2/ 缺失，UI 2.0 不可用，所有请求回退经典版")
+
 
 def _engine(request: Request) -> Jinja2Templates:
     """UI 版本选择：cookie fnxt.ui=2 走 2.0，缺省永远是经典版（1.0 一行未改）。"""
-    return tpl2 if request.cookies.get("fnxt.ui") == "2" else tpl
+    if request.cookies.get("fnxt.ui") == "2" and _UI2_AVAILABLE:
+        return tpl2
+    return tpl
 
 
 def render(request: Request, name: str, ctx: dict, **kwargs):
