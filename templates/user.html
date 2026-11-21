@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import poster %}
 {% block title %}{{ name }} · 观影时间线{% endblock %}
-{% block heading %}<span class="avbig" style="color:{{ color }}">{{ mark }}</span>{{ name }}{% endblock %}
+{% block heading %}<span class="avbig" style="color:{{ color }}">{{ initial(name) }}</span>{{ name }}{% endblock %}
 {% block sub %}第一次观看 {{ first }} · 最近 {{ last }}{% endblock %}
 {% block tools %}
 <a class="btn" href="/?u={{ name|urlencode }}">只看 {{ name }} 的时间线</a>

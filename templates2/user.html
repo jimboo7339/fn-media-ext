@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import poster %}
 {% block title %}{{ name }} · 观影时间线{% endblock %}
-{% block heading %}<span style="display:inline-grid;place-items:center;width:40px;height:40px;border-radius:13px;background:{{ color }};color:#fff;font-size:17px;font-weight:750;vertical-align:-10px;margin-right:10px;box-shadow:var(--sh-1)">{{ mark }}</span>{{ name }}{% endblock %}
+{% block heading %}<span style="display:inline-flex;align-items:center;gap:11px"><span style="display:inline-grid;place-items:center;width:40px;height:40px;border-radius:13px;background:{{ color }};color:#fff;font-size:17px;font-weight:750;box-shadow:var(--sh-1);flex:0 0 40px">{{ initial(name) }}</span><span>{{ name }}</span></span>{% endblock %}
 {% block sub %}第一次观看 {{ first }} · 最近 {{ last }}{% endblock %}
 {% block tools %}
 <a class="btn" href="/?u={{ name|urlencode }}">只看 {{ name }} 的时间线</a>

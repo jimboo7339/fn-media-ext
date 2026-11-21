@@ -265,7 +265,7 @@ html[data-theme="light"] .kpi{
   letter-spacing:-.8px;line-height:1.1;color:var(--head);font-variant-numeric:tabular-nums;
 }
 .kpi .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:4px}
-.kpi .v.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi .v.grad{background:linear-gradient(180deg,#8ea0ff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
 
 /* 分段控件 / 按钮 */
 .seg{display:inline-flex;gap:3px;padding:3px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-full)}
@@ -400,20 +400,24 @@ html[data-theme="light"] .cell.l3{background:#6a9ddc}html[data-theme="light"] .c
 
 /* ---------------- 表格 ---------------- */
 .tblwrap{overflow-x:auto;margin:0 -2px;padding:0 2px;-webkit-overflow-scrolling:touch}
-.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
 .tbl th{
-  position:sticky;top:64px;z-index:4;text-align:left;font-weight:550;font-size:11px;color:var(--dim);
+  text-align:left;font-weight:550;font-size:11px;color:var(--dim);
   padding:0 12px 9px;border-bottom:1px solid var(--line-2);white-space:nowrap;
-  background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(10px);
 }
 .tbl td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--muted)}
 .tbl tr{transition:background var(--t-1)}
 .tbl tbody tr:hover td{background:var(--hover)}
 .tbl td:first-child{color:var(--text)}
 .tbl .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;color:var(--dim)}
+/* 表格单元格里的进度条：td 宽度收缩时条会塌成一点，给个下限 */
+.tbl td .bar{min-width:96px}
 .tbl .who{display:flex;align-items:center;gap:7px}
 .tbl .who .d{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
-.mxt tr td:first-child{position:sticky;left:0;z-index:2;background:var(--panel-solid);box-shadow:6px 0 12px -8px rgba(0,0,0,.5)}
+/* 矩阵：首列钉在左侧——表头与单元格必须同时 sticky、同底色、同 z 层，
+   否则横向滚动时表头漂走（上一版就是漏了表头这一半） */
+.mxt th:first-child{position:sticky;left:0;z-index:5;background:var(--panel-solid)}
+.mxt tr td:first-child{position:sticky;left:0;z-index:4;background:var(--panel-solid);box-shadow:6px 0 12px -8px rgba(0,0,0,.5)}
 html[data-theme="light"] .mxt tr td:first-child{box-shadow:6px 0 12px -8px rgba(15,23,42,.15)}
 
 /* 排行行 */
@@ -499,7 +503,6 @@ label{font-size:12px;color:var(--muted);display:block}
   .rail{width:auto;flex:1}
   .shell{padding-bottom:96px}
   .dayhead{top:0}
-  .tbl th{position:static}
 }
 
 /* 表格卡片化（≤640px）：字段名靠 data-label */
